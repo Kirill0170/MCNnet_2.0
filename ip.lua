@@ -26,11 +26,13 @@ function checkFileIO()
   file:close()
 end
 function ip.isIP(ip_c)
+  if not ip_c then return false end
   local pattern = "%d+%.%d+%.%d+"
   if string.match(ip_c, pattern) then return true
   else return false end
 end
 function ip.isUUID(str)
+  if not str then return false end
   local pattern = "^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$"
   if string.match(str, pattern) then return true
   else return false end
