@@ -66,7 +66,7 @@ function ip.getLast()
   while true do
     local ipline=readipline(file)
     local t=file:read(2)
-    if t=="" then return ipline end
+    if t==nil then return ipline end
   end
 end
 function ip.getFromLine(ipline)
