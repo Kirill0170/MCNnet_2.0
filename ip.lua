@@ -50,7 +50,7 @@ end
     local ipline=""
     while true do
       local c=file2:read(1)
-      if c==nil then return ipline 
+      if c==nil then return ipline --<eof>
     elseif c=="|" then local _=file2:read(1) return ipline
       elseif c=="\n" then error("[IP READ]: Found /n when reading ipline")
       else ipline=ipline..c end
@@ -120,7 +120,7 @@ end
 function ip.getIp(uuid)
   if not ip.isUUID(uuid) then return nil end
   checkFileIO()
-  local file=io.open("ips.ipcfg")
+  local file=io.open("ips.ipcfg","r")
   file:read(7)
   while true do
     local ipline=readipline(file)
@@ -133,7 +133,7 @@ end
 function ip.getUUID(ip_c)
   if not ip.isIP(ip_c) then return nil end
   checkFileIO()
-  local file=io.open("ips.ipcfg")
+  local file=io.open("ips.ipcfg","r")
   file:read(7)
   while true do
     local ipline=readipline(file)
@@ -142,6 +142,24 @@ function ip.getUUID(ip_c)
     if ip_l==ip_c then return uuid_l end
   end
   return nil
+end
+function ip.getNodes() --gets all nodes ip, diven in filesystem
+  checkFileIO()
+  local file=io.open("ips.ipcfg","r")
+  file:read(7)
+  local ips={}
+  local i=0
+  while true do
+    local ipline=readipline(file)
+    if not ipline then break end
+    local ip_l,_=ip.getFromLine(ipline)
+    local i1,i2,i3=ip.getNums(ip_l)
+    if i3==0 then 
+      ips[i]=ip_l
+      i=i+1
+    end
+  end
+  return ips
 end
 return ip
 --[[
