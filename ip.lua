@@ -1,6 +1,7 @@
 --MCnet IP handling v1.0 EXPERIMENTAL
 --Modem is required.
---Don't forget to check file using ip.checkFile(gid,nid)!!!! 
+--Don't forget to check file using ip.checkFile(gid,nid)!!!!
+--REWORK IP ADDRESS SYSTEM!: ADD CHECK FOR THIS NODE AND OTHER NODES IPS
 --init----------------------
 local component=require("component")
 if not component.isAvailable("modem") then error("[IP INIT]: No modem present") end
@@ -57,18 +58,6 @@ end
     end
   end
 --util----------------------
-function ip.getLast()
-  --prep
-  checkFileIO()
-  local file=io.open("ips.ipcfg","r")
-  file:read(7)
-  --main
-  while true do
-    local ipline=readipline(file)
-    local t=file:read(2)
-    if t==nil then return ipline end
-  end
-end
 function ip.getFromLine(ipline)
   if not ipline then error("[IP gFL]: Invalid ipline provided") end
   local ip_l=string.sub(ipline,1,string.find(ipline,"="))
@@ -89,6 +78,24 @@ function ip.getNums(raw_ip)
         table.insert(numbers, tonumber(number))
     end
     return unpack(numbers)
+end
+function ip.getLast()
+  --prep
+  checkFileIO()
+  local file=io.open("ips.ipcfg","r")
+  file:read(7)
+  --main
+  local last_ipline=""
+  while true do
+    ipline=readipline(file)
+    --check if this node
+    local ip_l,_=ip.getFromLine(ipline)
+    local i1,i2,i3=ip.getNums(ip_l)
+    if i2==groupid then last_ipline=ipline end
+    --next
+    local t=file:read(1)
+    if t==nil then return last_ipline end
+  end
 end
 function ip.addIp(ip,uuid)
   --checkfile
