@@ -28,8 +28,17 @@ end
 function ip.isIP(ip_c)
   if not ip_c then return false end
   local pattern = "%d+%.%d+%.%d+"
-  if string.match(ip_c, pattern) then return true
+  if string.match(ip_c, pattern) then --yes
   else return false end
+  local numbers = {}
+    for number in ip_c:gmatch("%d+") do
+        table.insert(numbers, tonumber(number))
+    end
+  local num1,num2,num3=unpack(numbers)
+  if num1<0 or num1>999 then return false end
+  if num1<0 or num1>999 then return false end
+  if num1<=0 or num1>999 then return false end
+  return true
 end
 function ip.isUUID(str)
   if not str then return false end
