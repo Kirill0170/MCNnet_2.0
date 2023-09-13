@@ -7,6 +7,7 @@ local component=require("component")
 if not component.isAvailable("modem") then error("[IP INIT]: No modem present") end
 local this_uuid=component.getPrimary("modem")["address"]
 local ip={}
+local mode="node"
 local groupid=-1
 local nodeid=-1
 ----------------------------
@@ -14,7 +15,9 @@ function ip.newFile()
   local file=io.open("ips.ipcfg","w")
   if not file then error("[IP NF]: Error creating ips.ipcfg file") end
   file:write("0x000F\n")
-  file:write(groupid.."."..nodeid..".0="..this_uuid)
+  if mode=="node" then
+    file:write(groupid.."."..nodeid..".0="..this_uuid) 
+  end
   file:close()
   return "ips.ipcfg"
 end
@@ -57,6 +60,12 @@ end
       else ipline=ipline..c end
     end
   end
+function  ip.setMode(new_mode)
+  if new_mode~="node" and new_mode~="client" and new_mode~="server" then
+    return false end
+  mode=new_mode
+  return true
+end
 --util----------------------
 function ip.getFromLine(ipline)
   if not ipline then error("[IP gFL]: Invalid ipline provided") end
@@ -168,6 +177,7 @@ function ip.getNodes() --gets all nodes ip, diven in filesystem
   end
   return ips
 end
+
 return ip
 --[[
 ip: groupid:nodeid:clientid
