@@ -2,14 +2,12 @@
 Advanced node networking for Open Computers, still under active development.
 
 ## About
-MCNnet 2.0 stands for Minecraft Computer Node network, which is used to connect computers over distance using nodes. Not only you can connect two computers - you can create servers, on which users will be able to join. The only limitation - nodes must be within 400 block range, as it's default connect range of wireless network card.
+MCNnet 2.0 stands for Minecraft Computer Node network, which is used to connect computers over distance using nodes. Not only you can connect two computers - you can create servers, on which users will be able to join. The only limitation - nodes must be within 400 block range, as it's default connect range of wireless network card. However, usage of linked cards is possible, using Tunnel Nodes (Tnodes), allowing connections between distant places and across dimentions.
 ## IP address system
-MCNnet uses IP address system, which looks similar to real one, yet is very different: it uses 3 numbers instead of 4, and numbers can me very high - up to 999 or even more. First number is GroupID - a group of nodes, Second number is NodeID - the number of a node in the group, Third one - is ClientID, indicates which client is connected to the node(nodes use ClientID=0). So, a typical IP will look like this: 12.35.19
+MCNnet uses it's own simple address system, which consists of first 4 digits of node's UUID and first 4 digits of client UUID, so they look like this: 12ab:34cd. Nodes have 0000 in their client ID, like this: 12ab:0000.
 ## Servers
-Servers are special clients, which can handle connections from different clients. There are 5 main types of servers:\
-**Terminal Server** - a server with just a lua script running on it, which can be anything you want!\
-**FS Server** - FileSystem server - is used to store files, for example - a cloud service, providing more place for everyone!\
-**Website Server** - a type of server which is still under development and will be released later, will host websites using HTML-like markup language!\
-**Email Server** - a server with mail system attached to it, combine it with FS server - and you have pretty much a BBS!\
-**MNC Server** - Multi-Node Chat server, will allow users to chat in-real time: it's like IRC!\
-The important part is, while i will provide you with template servers for each of above(eventually), you can write servers yourself - like the rest of OpenComputers. Just by using API, you will be able to create everything you want.
+Servers are special clients, which can handle connections from different clients. There are different protocols of connecting to server:  
+**[Term]** - simple terminal connection, allows basic I/O facilities.  
+**[FTP]** - simple File Transfer Protocol connection, however does not support TUI.  
+**[FTerm]** - simple terminal with FTP attached to it, can download and upload files.  
+**[GSTP]** - [Planned] Graphical Site Transfer Protocol - graphical sites, as we know it.  
