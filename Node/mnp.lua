@@ -10,6 +10,7 @@ local ser=require("serialization")
 local modem=component.modem
 local event=require("event")
 local ip=require("ipv2")
+local dns=require("dns")
 local gpu=component.gpu
 local mnp_ver="2.1 EXPERIMENTAL"
 local ses_ver="1.21 EXPERIMENTAL"
@@ -33,6 +34,7 @@ print("[MNP INIT]: MNP version "..mnp_ver)
 print("[MNP INIT]: MNCP version "..mncp_ver)
 print("[MNP INIT]: SP version "..ses_ver)
 print("[MNP INIT]: IP version "..ip.ver())
+print("[MNP INIT]: DNS version "..dns.ver())
 print("[MNP INIT]: Done")
 --Session--------------------------------
 function mnp.checkSession(sessionInfo)
