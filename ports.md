@@ -14,7 +14,7 @@ MRCCP - MCNnet Remote Console Connection Protocol\
 1006 - MFTP connect\
 1007 - MFTP DATA\
 1008 - MFTP service (chk_con)\
-1009 - MNP security (dev)\
+1009 - DNS Lookup\
 1010 - MNP security (dev)\
 1020 - MRCCP requests\
 1021 - MRCCP send\
