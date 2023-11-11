@@ -235,6 +235,8 @@ function mnp.search(from,sessionInfo)
       local to=ip.findUUID(si[tonumber(si["c"])-1])
       if not to then log("Unsuccessful search: Unknown IP: ",2)
       else modem.send(to,ports["mnp_srch"],ser.serialize(si)) end --CORRECT
+    else
+      --write search :/
     end
   else --returning to requester
     local num=0
@@ -264,9 +266,127 @@ function mnp.data(from,sessionInfo,data)
   if not t_uuid then return false
   else modem.send(t_uuid,ports["mnp_data"],"data",ser.serialize(sessionInfo),data) end
 end
-function mnp.dnsLookup(from,si,data)
-  
+function mnp.data(from,sessionInfo,data)
+  if not from then return false end
+  if not mnp.checkSession(sessionInfo) then return false end
+  if not sessionInfo["f"] then return false end
+  local current=0
+  for key,val in pairs(sessionInfo) do
+    if val==os.getenv("this_ip") then current=key break end
+  end
+  local t_uuid=ip.findUUID(sessionInfo[current+1])
+  if not t_uuid then return false
+  else modem.send(t_uuid,ports["mnp_data"],"data",ser.serialize(sessionInfo),data) end
+end
+
+function mnp.dnsLookup(from,sessionInfo,data)
+  if not ip.isUUID(from) or not mnp.checkSession(sessionInfo) or not data then
+    log("Unvalid arguments for dns lookup",2)
+    return false
+  end
+  local si=ser.unserialize(sessionInfo)
+  data=ser.unserialize(data)
+  if not si["f"] then --lookup
+    if si["ttl"]<=1 then
+      log("Search discarded: ttl is 1",1)
+      if ttllog then
+        log("Saving session info to latest_ttl.log",1)
+        local file=io.open("latest_ttl.log","w")
+        file:write("["..computer.uptime().."]Latest TTL discardment (DNS lookup)")
+        file:write(ser.unserialize(sessionInfo,true))
+        file:close()
+      end
+      return false
+    end
+    --check local
+    local d_ip,d_protocol = dns.lookup(data[1])
+    if d_ip then --found
+      local response={}
+      --check protocol
+      if d_protocol~=data[2] then table.append(response,"D2")
+      else table.append(response,"D1") end
+      data[3]=response
+      si["f"]=true
+      si[si["c"]]=ip.findUUID(d_ip)
+      si["c"]=si["c"]+1
+      --send(im tired)
+    end
+  else --returning to requester
+    local num=0
+    for n,v in pairs(si) do
+      if v==os.getenv("this_ip") then num=n break end
+    end
+    if num>1 then
+      local to=ip.findUUID(si[tonumber(num-1)])
+      if not to then log("Unsuccessful search: Unknown IP: ",2) 
+      else modem.send(to,ports["dns_lookup"],sessionInfo) end
+    else --local
+      local to=ip.findUUID(si[0])
+      if not to then log("Unsuccessful search: Unknown IP: ",2)
+      else modem.send(to,ports["dns_lookup"],sessionInfo) end
+    end
+  end
 end
 -------
 
 return mnp
+--[[ sessionInfo
+[uuid]:<session uuid>
+[t]:<target_ip>
+[ttl]:<time-to-live>
+[c]:<int(num of ips)>
+[0]:<ip(from)>
+[1]:<ip(node)>
+...
+[c-1]:<ip(target)>
+[f]:<found? bool>
+]]
+--[[
+ip: 12ab:34cd
+  NodeIP:ClientIP
+node ip: 12ab:0000
+dns ip: 12ab:000D [sys only]
+
+node ip table:
+nips["12ab:34cd"]="<ClientIP>"
+nips["56ef:0000"]="<NodeIP>"
+]]
+--[[ PORTS
+1000 - MNP registartion
+1001 - MNP search
+1002 - MNP data(casual)
+1003 - MNCP service (chk_con)
+1004 - MNCP errors
+1005 - MNCP ping
+1006 - MFTP connect
+1007 - MFTP DATA
+1008 - MFTP service (chk_con)
+1009 - DNS lookup
+1010 - MNP security (dev)
+1020 - MRCCP requests
+1021 - MRCCP send
+1022 - MRCCP receive
+3000+ - For Server Use
+]]
+--[[ CLIENT REG SI
+[0]: "0000:0000"
+[ttl]: 2
+[c]: 1
+[t]: "broadcast"
+]]
+--[[ GET DNS REQUEST
+mtype="dnslookup"
+data={"<domain>,"<protocol>"}
+response data={"<domain>,"<protocol>","<statuscode>","<ipv2>"}
+status codes:
+D1 - OK
+D2 - INCORRECT PROTOCOL
+D3 - RESOURCE DOWN
+sessionInfo:
+[[
+[0]: <clientIP>
+[t]: "dnsserver"
+[f]: true/false
+]]
+--connect 12ab:34cd
+--TODO: REDIRECTS --WIP
