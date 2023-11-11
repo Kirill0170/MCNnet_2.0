@@ -9,6 +9,7 @@ local event=require("event")
 local gpu=component.gpu
 local mnp=require("mnp")
 local ip=require("ipv2")
+local dns=require("dns")
 local err = false
 busy={} --list of busy uuids
 --functions
@@ -75,6 +76,8 @@ log("Setup ipv2...")
 ip.setMode("NODE")
 local this_ip=ip.gnip()
 if not ip.set(this_ip) then log("Could not set node IP",3) end
+log("Setup DNS...")
+dns.init()
 log("Registering!")
 local timeout=2
 local attempts=5

@@ -9,10 +9,16 @@ function dns.checkHostname(name)
   local pattern = "^%w+%.%w+$"
   return string.match(name, pattern) ~= nil
 end
-function dns.init() --clears!
-  local file=io.open(filename,"w")
-  file:write(ser.serialize({}))
-  file:close()
+function dns.init(reset) --clears!
+  local t={}
+  if not reset then
+    local file=io.open(filename,"r")
+    t=ser.unserialize(file:read("*a"))
+    file:close()
+  end
+  local file2=io.open(filename,"w")
+  file2:write(ser.serialize(t))
+  file2:close()
 end
 function dns.add(ip,hostname,protocol)
   if not protocol or not ip or not hostname then return false end
