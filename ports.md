@@ -5,6 +5,7 @@ MNP - MCNnet Networking Protocol\
 MNCP - MCNnet Networking Control Protocol\
 MFTP - MCNnet File Transfer Protocol\
 MRCCP - MCNnet Remote Console Connection Protocol\
+## Ports:
 1000 - MNP registartion\
 1001 - MNP search\
 1002 - MNP data(default)\
