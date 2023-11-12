@@ -175,11 +175,13 @@ function mnp.node_register(a,t)
   if ct then modem.close(ports["mnp_reg"]) end
   return true
 end
-function mnp.register(from,si)
+
+function mnp.register(from,si,data)
   if not from or not mnp.checkSession(si) then
     log("Unvalid arguments for register",2)
     return false
   end
+  data=ser.unserialize(data)
   if si["c"]>1 then
     log("Non-local registration is not supported: c="..si["c"],2)
     return false
@@ -197,14 +199,27 @@ function mnp.register(from,si)
     log("Registered new node: "..si[0])
     return true
   elseif ip.isIPv2(si[0]) then --client/server
+    if data then -- DNS server [OPTIMIZATION REQUIRED]
+      if dns.checkHostname(data[1]) and data[2]~=nil then --TODO: check protocol
+        local s_ip=string.sub(os.getenv("this_ip"),1,5)..string.sub(from,1,4)
+        dns.add(s_ip,data[1],data[2])
+        local rsi=ser.serialize(mnp.newSession(os.getenv),"",1)
+        modem.send(from,ports["mnp_reg"],rsi)
+      else --incorrect
+        log("Registration failed: incorrect hostname",1)
+        return false
+      end
+    else --regular
       ip.addUUID(from)
       local rsi=ser.serialize(mnp.newSession(os.getenv("this_ip"),"",1))
       modem.send(from,ports["mnp_reg"],rsi)
       log("Registered new server/client: "..si[0])
+    end
   else
     log("Registartion failed: unknown IPv2 error",1)
     return false
   end
+  return true
 end
 
 function mnp.search(from,sessionInfo)
@@ -212,7 +227,7 @@ function mnp.search(from,sessionInfo)
     log("Unvalid arguments for search",2)
     return false
   end
-  local si=ser.unserialize(sessionInfo)
+  local si=sessionInfo --FIX: session is already unserialized
   if not si["f"] then --search
     if si["ttl"]<=1 then
       log("Search discarded: ttl is 1",1)
@@ -289,7 +304,7 @@ function mnp.dnsLookup(from,sessionInfo,data)
     log("Unvalid arguments for dns lookup",2)
     return false
   end
-  local si=ser.unserialize(sessionInfo)
+  local si=sessionInfo --FIX: already unserialized, dum-dum
   data=ser.unserialize(data)
   if not si["f"] then --lookup
     if si["ttl"]<=1 then
