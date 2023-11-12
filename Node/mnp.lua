@@ -232,25 +232,30 @@ function mnp.search(from,sessionInfo)
       si[si["c"]]=ip.findIP(l_uuid)
       si["c"]=si["c"]+1
       si["f"]=true
-      local to=ip.findUUID(si[tonumber(si["c"])-1])
+      local to=ip.findUUID(si[tonumber(si["c"])-2])
       if not to then log("Unsuccessful search: Unknown IP: ",2)
-      else modem.send(to,ports["mnp_srch"],ser.serialize(si)) end --CORRECT
+      else modem.send(to,ports["mnp_srch"],"search",ser.serialize(si)) end --CORRECT
     else
       --write search :/
+      local nodes=ip.getNodes(os.getenv("this_ip"))
+      for uuid in pairs(nodes) do
+        local rsi=mnp.addIpToSession(si,ip.findIP(uuid))
+        modem.send(uuid,ports["mnp_srch"],"search",ser.serialize(rsi))
+      end
     end
   else --returning to requester
     local num=0
     for n,v in pairs(si) do
       if v==os.getenv("this_ip") then num=n break end
     end
-    if num>1 then
+    if num>1 then --OPTIMIZATION REQUIRED
       local to=ip.findUUID(si[tonumber(num-1)])
       if not to then log("Unsuccessful search: Unknown IP: ",2) 
-      else modem.send(to,ports["mnp_srch"],sessionInfo) end
+      else modem.send(to,ports["mnp_srch"],"search",sessionInfo) end
     else --local
       local to=ip.findUUID(si[0])
       if not to then log("Unsuccessful search: Unknown IP: ",2)
-      else modem.send(to,ports["mnp_srch"],sessionInfo) end
+      else modem.send(to,ports["mnp_srch"],"search",sessionInfo) end
     end
   end
 end
@@ -301,29 +306,38 @@ function mnp.dnsLookup(from,sessionInfo,data)
     --check local
     local d_ip,d_protocol = dns.lookup(data[1])
     if d_ip then --found
-      local response={}
       --check protocol
-      if d_protocol~=data[2] then table.append(response,"D2")
-      else table.append(response,"D1") end
+      if d_protocol~=data[2] then table.append(data,"D2")
+      else table.append(data,"D1") table.append(data,d_ip) end
       data[3]=response
       si["f"]=true
       si[si["c"]]=ip.findUUID(d_ip)
       si["c"]=si["c"]+1
       --send(im tired)
+      local to=ip.findUUID(si[si["c"]-2])
+      if not to then log("Unsuccessful dns lookup: Unknown IP: ",2)
+      else modem.send(to,ports["dns_lookup"],"dns_lookup",ser.serialize(si),ser.serialize(data)) end --send
+    else --not found
+      --send to other nodes
+      local nodes=ip.getNodes(os.getenv("this_ip"))
+      for uuid in pairs(nodes) do
+        local rsi=mnp.addIpToSession(si,ip.findIP(uuid))
+        modem.send(uuid,ports["mnp_srch"],"dns_lookup",ser.serialize(rsi),ser.serialize(data))
+      end
     end
   else --returning to requester
     local num=0
     for n,v in pairs(si) do
       if v==os.getenv("this_ip") then num=n break end
     end
-    if num>1 then
+    if num>1 then --OPTIMIZATION REQUIRED
       local to=ip.findUUID(si[tonumber(num-1)])
-      if not to then log("Unsuccessful search: Unknown IP: ",2) 
-      else modem.send(to,ports["dns_lookup"],sessionInfo) end
+      if not to then log("Unsuccessful dns lookup: Unknown IP: ",2) 
+      else modem.send(to,ports["dns_lookup"],"dns_lookup",sessionInfo,ser.serialize(data)) end
     else --local
       local to=ip.findUUID(si[0])
-      if not to then log("Unsuccessful search: Unknown IP: ",2)
-      else modem.send(to,ports["dns_lookup"],sessionInfo) end
+      if not to then log("Unsuccessful dns lookup: Unknown IP: ",2)
+      else modem.send(to,ports["dns_lookup"],"dns_lookup",sessionInfo,ser.serialize(data)) end
     end
   end
 end
@@ -389,4 +403,4 @@ sessionInfo:
 [f]: true/false
 ]]
 --connect 12ab:34cd
---TODO: REDIRECTS --WIP
+--TODO: REDIRECTS
