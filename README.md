@@ -13,3 +13,4 @@ Servers are special clients, which can handle connections from different clients
 **[FTP]** - simple File Transfer Protocol connection, however does not support TUI.  
 **[FTerm]** - simple terminal with FTP attached to it, can download and upload files.  
 **[GSTP]** - [Planned] Graphical Site Transfer Protocol - graphical sites, as we know it.  
+**[UAP]** - Universal Auth Protocol, for managing logins.
