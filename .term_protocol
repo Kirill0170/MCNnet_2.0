@@ -1,0 +1,24 @@
+TERM CONNECTION
+- simple terminal I/O with server
+
+1) connection to server (path is found)
+(c->s) "connect",{<session>},{}
+(c<-s) "connection",{<session>},{<statusCode>}
+  0: OK
+  1: Error
+  2: Forbidden
+  3: Closed
+  4: Timeout
+2) init TERM connection
+(c->s) "term",{<session>}, {"init",{"version"="<TERM version>"},{}}
+(c<-s) "term",{<session>}, {"init",{"uap"=true/false},{"OK"}} OR {"CR"} --connection refused
+3) if UAP (this section can change)
+(c->s) "uap",{<session>}, {"login"="<login>","pass"="<password>"} --!!not encrypted
+(c<-s) "uap",{<session>}, {"retry/accepted/denied"}
+4) ... client with server connection ...
+5) disconnect
+a) client disconnect 
+  (c->s) "term",{<session>}, {"exit",{},{}}
+  (c<-s) "connection",{<session>}, {3}
+b) client timeout
+  (c<-s) "connection",{<session>}, {4}
