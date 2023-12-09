@@ -359,7 +359,7 @@ end
 -------
 
 return mnp
---[[ sessionInfo
+--[[ session
 [uuid]:<session uuid>
 [t]:<target_ip>
 [ttl]:<time-to-live>
@@ -411,11 +411,21 @@ status codes:
 D1 - OK
 D2 - INCORRECT PROTOCOL
 D3 - RESOURCE DOWN
-sessionInfo:
+session:
 [[
 [0]: <clientIP>
 [t]: "dnsserver"
 [f]: true/false
+]]
+--[[ TERM PROTOCOL
+session: [f]:true (need to find first)
+data:
+[[
+"<mtype>",{<options>},{<data>}
+m-types:
+(s->c)"text",{x:0,y:0,fgcol:0xFFFFFF,bgcol:"default"},{"<sample text>"}
+(s->c)"input_request",{},{}
+(s<-c)"input_response",{},{"<input>"}
 ]]
 --connect 12ab:34cd
 --TODO: REDIRECTS
