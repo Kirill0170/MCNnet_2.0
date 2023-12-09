@@ -417,12 +417,15 @@ session:
 [t]: "dnsserver"
 [f]: true/false
 ]]
---[[ TERM PROTOCOL
+--[[ TERM PROTOCOL (refer to .term_protocol)
+"term"
 session: [f]:true (need to find first)
 data:
 [[
 "<mtype>",{<options>},{<data>}
 m-types:
+(s<-c)"init",{"version"="<TERM version>"},{}
+(s->c)"init",{"uap"=true/false},{"OK/CR"}
 (s->c)"text",{x:0,y:0,fgcol:0xFFFFFF,bgcol:"default"},{"<sample text>"}
 (s->c)"input_request",{},{}
 (s<-c)"input_response",{},{"<input>"}
