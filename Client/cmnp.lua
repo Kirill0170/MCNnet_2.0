@@ -171,10 +171,42 @@ function mnp.search(to_ip)
     end
   end
 end
-function mnp.connect(name)
-  if ip.isIPv2(name) then
-
-  else --probably DN
-    
+function mnp.connect(sessionTemplate,attempts,timeout) --client
+  if not mnp.checkSession(sessionTemplate) or not sessionTemplate["f"] then return false end
+  if not tonumber(attempts) then attempts=2 end
+  if not tonumber(timeout) then timeout=5 end
+  for att=1,attempts do
+    log("Connecting.. attempt: "..att)
+    modem.send(os.getenv("node_uuid"),ports["mnp_conn"],"connect",ser.serialize(sessionTemplate))
+    local _,_,_,_,_,mtype,sessionInfo,data=event.pull(timeout,"modem")
+    if mtype=="connection" and SessionInfo["t"]==os.getenv("this_ip") then --idk
+      data=unserialize(data)
+      statusCode=data[1]
+      if statusCode==0 then --OK
+        log("Connection established")
+        os.setenv("conn_ip",sessionInfo)
+        return true
+      elseif statusCode==1 then --Error
+        log("Connection returned error code 1",1)
+        return false
+      elseif statusCode==2 then --Forbidden
+        log("Connection forbidden.",1)
+        return false
+      else
+        log("Connection returned unknown code",2)
+        return false
+      end
+    else end
   end
+  log("Cannot connect",1)
+  return false
+end
+function mnp.connection(si,data,connectedList) --server
+  if not mnp.checkSession(si) or not data then return false end
+  data=ser.unserialize(data)
+  --banned uuids here
+  table.insert(connectedList,si[0])
+  data={1}
+  si["r"]=true
+  modem.send(si[c-2],"connection",ser.serialize(si),ser.serialize(data))
 end
