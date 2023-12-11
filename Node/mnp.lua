@@ -274,7 +274,7 @@ function mnp.search(from,sessionInfo)
     end
   end
 end
-function mnp.data(from,sessionInfo,data)
+function mnp.data(from,sessionInfo,data) --outdated;do not use
   if not from then return false end
   if not mnp.checkSession(sessionInfo) then return false end
   if not sessionInfo["f"] then return false end
@@ -355,6 +355,27 @@ function mnp.dnsLookup(from,sessionInfo,data)
       else modem.send(to,ports["dns_lookup"],"dns_lookup",sessionInfo,ser.serialize(data)) end
     end
   end
+end
+function mnp.pass(port,mtype,si,data) --node
+  if not port or ont mtype or not si then return false end
+  local num=0
+  for n,v in pairs(si) do
+    if v==os.getenv("this_ip") then num=n break end
+  end
+  if num>1 then --OPTIMIZATION REQUIRED
+    local to
+    if si["r"]==true then to=ip.findUUID(si[tonumber(num-1)])
+    else to=ip.findUUID(si[tonumber(num+1)]) end
+    if not to then log("Unsuccessful dns lookup: Unknown IP: ",2) 
+    else modem.send(to,ports["dns_lookup"],"dns_lookup",sessionInfo,ser.serialize(data)) end
+  else --local
+    local to
+    if si["r"]==true then to=ip.findUUID(si[tonumber(num-1)])
+    else to=ip.findUUID(si[tonumber(num+1)]) end
+    if not to then log("Unsuccessful dns lookup: Unknown IP: ",2)
+    else modem.send(to,ports["dns_lookup"],"dns_lookup",sessionInfo,ser.serialize(data)) end
+  end
+  return true
 end
 -------
 
