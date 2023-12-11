@@ -11,7 +11,7 @@ local mnp=require("mnp")
 local ip=require("ipv2")
 local dns=require("dns")
 local err = false
-busy={} --list of busy uuids
+busy={} --list of busy uuids(deprecated)
 --functions
 function isBusy(g_uuid)
   for _, value in pairs(busy) do
@@ -57,12 +57,15 @@ function session(from,port,mtype,sessionInfo,data)
   if not sessionInfo then return false end
   si=ser.unserialize(sessionInfo)
   if not mnp.checkSession(si) then log("Unvalid SessionInfo received",1) return false end
-  if port==1000 and mtype=="register" then
+  if mtype=="register" then
     mnp.register(from,si)
-  elseif port==1001 and mtype=="search" then
+  elseif mtype=="search" then
     mnp.search(from,si)
-  elseif port==1002 and mtype=="data" then
+  elseif mtype=="data" then
     mnp.data(from,si,data)
+  else --pass
+    log("Passing packet")
+    mnp.pass(port,mtype,si,data)
   end
 end
 --setup

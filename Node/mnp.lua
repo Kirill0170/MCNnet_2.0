@@ -326,6 +326,7 @@ function mnp.dnsLookup(from,sessionInfo,data)
       else table.append(data,"D1") table.append(data,d_ip) end
       data[3]=response
       si["f"]=true
+      si["r"]=true
       si[si["c"]]=ip.findUUID(d_ip)
       si["c"]=si["c"]+1
       --send(im tired)
@@ -356,6 +357,27 @@ function mnp.dnsLookup(from,sessionInfo,data)
     end
   end
 end
+function mnp.pass(port,mtype,si,data) --node
+  if not port or ont mtype or not si then return false end
+  local num=0
+  for n,v in pairs(si) do
+    if v==os.getenv("this_ip") then num=n break end
+  end
+  if num>1 then --OPTIMIZATION REQUIRED
+    local to
+    if si["r"]==true then to=ip.findUUID(si[tonumber(num-1)])
+    else to=ip.findUUID(si[tonumber(num+1)]) end
+    if not to then log("Unsuccessful dns lookup: Unknown IP: ",2) 
+    else modem.send(to,ports["dns_lookup"],"dns_lookup",sessionInfo,ser.serialize(data)) end
+  else --local
+    local to
+    if si["r"]==true then to=ip.findUUID(si[tonumber(num-1)])
+    else to=ip.findUUID(si[tonumber(num+1)]) end
+    if not to then log("Unsuccessful dns lookup: Unknown IP: ",2)
+    else modem.send(to,ports["dns_lookup"],"dns_lookup",sessionInfo,ser.serialize(data)) end
+  end
+  return true
+end
 -------
 
 return mnp
@@ -369,6 +391,7 @@ return mnp
 ...
 [c-1]:<ip(target)>
 [f]:<found? bool>
+[r]:<reverse? bool>
 ]]
 --[[
 ip: 12ab:34cd
@@ -416,6 +439,10 @@ sessionInfo:
 [0]: <clientIP>
 [t]: "dnsserver"
 [f]: true/false
+]]
+--[[ CONNECTION
+sessionInfo:
+[f]: true
 ]]
 --connect 12ab:34cd
 --TODO: REDIRECTS
