@@ -357,7 +357,7 @@ function mnp.dnsLookup(from,sessionInfo,data)
   end
 end
 function mnp.pass(port,mtype,si,data) --node
-  if not port or ont mtype or not si then return false end
+  if not port or not mtype or not si then return false end
   local num=0
   for n,v in pairs(si) do
     if v==os.getenv("this_ip") then num=n break end
