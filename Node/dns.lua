@@ -13,8 +13,10 @@ function dns.init(reset) --clears!
   local t={}
   if not reset then
     local file=io.open(filename,"r")
-    t=ser.unserialize(file:read("*a"))
-    file:close()
+    if file then
+      t=ser.unserialize(file:read("*a"))
+      file:close()
+    end
   end
   local file2=io.open(filename,"w")
   file2:write(ser.serialize(t))
