@@ -280,7 +280,7 @@ function mnp.search(from,sessionInfo) --TODO: error codes
     end
   end
 end
-function mnp.data(from,sessionInfo,data)
+function mnp.data(from,sessionInfo,data) --outdated;do not use
   if not from then return false end
   if not mnp.checkSession(sessionInfo) then return false end
   if not sessionInfo["f"] then return false end
@@ -370,7 +370,7 @@ function mnp.dnsLookup(from,sessionInfo,data) --TODO: return error codes
   end
 end
 function mnp.pass(port,mtype,si,data) --node
-  if not port or ont mtype or not si then return false end
+  if not port or not mtype or not si then return false end
   local num=0
   for n,v in pairs(si) do
     if v==os.getenv("this_ip") then num=n break end
@@ -393,7 +393,7 @@ end
 -------
 
 return mnp
---[[ sessionInfo
+--[[ session
 [uuid]:<session uuid>
 [t]:<target_ip>
 [ttl]:<time-to-live>
@@ -446,15 +446,24 @@ status codes:
 D1 - OK
 D2 - INCORRECT PROTOCOL
 D3 - RESOURCE DOWN
-sessionInfo:
+session:
 [[
 [0]: <clientIP>
 [t]: "dnsserver"
 [f]: true/false
 ]]
---[[ CONNECTION
-sessionInfo:
-[f]: true
+--[[ TERM PROTOCOL (refer to .term_protocol)
+"term"
+session: [f]:true (need to find first)
+data:
+[[
+"<mtype>",{<options>},{<data>}
+m-types:
+(s<-c)"init",{"version"="<TERM version>"},{}
+(s->c)"init",{"uap"=true/false},{"OK/CR"}
+(s->c)"text",{x:0,y:0,fgcol:0xFFFFFF,bgcol:"default"},{"<sample text>"}
+(s->c)"input_request",{},{}
+(s<-c)"input_response",{},{"<input>"}
 ]]
 --connect 12ab:34cd
 --TODO: REDIRECTS
