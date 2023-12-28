@@ -222,23 +222,29 @@ function mnp.register(from,si,data)
   return true
 end
 
-function mnp.search(from,sessionInfo)
+function mnp.search(from,sessionInfo) --TODO: error codes
   if not ip.isUUID(from) or not mnp.checkSession(sessionInfo) then
     log("Unvalid arguments for search",2)
     return false
   end
   local si=sessionInfo --FIX: session is already unserialized
-  if not si["f"] then --search
-    if si["ttl"]<=1 then
-      log("Search discarded: ttl is 1",1)
-      if ttllog then
-        log("Saving session info to latest_ttl.log",1)
-        local file=io.open("latest_ttl.log","w")
-        file:write("["..computer.uptime().."]Latest TTL discardment")
-        file:write(ser.unserialize(sessionInfo,true))
-        file:close()
+    if not si["f"] then --search
+      for k,v in pairs(si) do --check if looped
+        if v==os.getenv("this_ip") then
+          log("Search discarded: looped",1)
+          return false 
+        end
       end
-      return false
+      if si["ttl"]<=1 then
+        log("Search discarded: ttl is 1",1)
+        if ttllog then
+          log("Saving session info to latest_ttl.log",1)
+          local file=io.open("latest_ttl.log","w")
+          file:write("["..computer.uptime().."]Latest TTL discardment")
+          file:write(ser.unserialize(sessionInfo,true))
+          file:close()
+        end
+        return false
     end
     --check local
     local l_uuid=ip.findUUID(si["t"])
@@ -299,7 +305,7 @@ function mnp.data(from,sessionInfo,data)
   else modem.send(t_uuid,ports["mnp_data"],"data",ser.serialize(sessionInfo),data) end
 end
 
-function mnp.dnsLookup(from,sessionInfo,data)
+function mnp.dnsLookup(from,sessionInfo,data) --TODO: return error codes
   if not ip.isUUID(from) or not mnp.checkSession(sessionInfo) or not data then
     log("Unvalid arguments for dns lookup",2)
     return false
@@ -307,6 +313,12 @@ function mnp.dnsLookup(from,sessionInfo,data)
   local si=sessionInfo --FIX: already unserialized, dum-dum
   data=ser.unserialize(data)
   if not si["f"] then --lookup
+    for k,v in pairs(si) do --check if looped
+      if v==os.getenv("this_ip") then
+        log("Search discarded: looped",1)
+        return false 
+      end
+    end
     if si["ttl"]<=1 then
       log("Search discarded: ttl is 1",1)
       if ttllog then
