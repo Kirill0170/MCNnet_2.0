@@ -430,6 +430,7 @@ nips["56ef:0000"]="<NodeIP>"
 1020 - MRCCP requests
 1021 - MRCCP send
 1022 - MRCCP receive
+2000+ - Protocols
 3000+ - For Server Use
 ]]
 --[[ CLIENT REG SI
@@ -467,3 +468,4 @@ m-types:
 ]]
 --connect 12ab:34cd
 --TODO: REDIRECTS
+--IDEA: NODE SOURCE CODE HASH CHECKING
