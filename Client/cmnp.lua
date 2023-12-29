@@ -76,11 +76,14 @@ function mnp.mncpCliService()
   end
 end
 --DNS------------------------------------
-function mnp.dnsService() --SERVER USAGE ONLY
+function mnp.dnsService() --SERVER USAGE ONLY(DEPRECATED)
   if dnsName then
     local err=false
     repeat
-      local _,_,from,_,_
+      local _,_,from,port,_,mtype,si,data=event.pull("modem")
+      if port==ports["dns_lookup"] and mtype=="dnslookup" then
+        
+      end
     until err
   else return false end
 end
@@ -149,7 +152,8 @@ function mnp.register(a,t)
   if not connect then return false end
   return true
 end
-function mnp.search(to_ip)
+function mnp.search(to_ip)--NO ATTEMPTS HANDLING
+  if not to_ip then return false end
   local si=ser.serialize(mnp.newSession(to_ip))
   modem.send(os.getenv("node_uuid"),ports["mnp_srch"],"search",si)
   log("Stated search...")
@@ -166,6 +170,36 @@ function mnp.search(to_ip)
         else
           --save session
           sp[rsi["t"]]=rsi
+          log("Search completed, took "..computer.uptime()-start_time)
+          return true
+        end
+      end
+    end
+  end
+function mnp.dnslookup(hostname,protocol) --unfinished + no attempts
+  if not hostname or not protocol then return false end
+  local si=ser.serialize(mnp.newSession("broadcast"))
+  data={}
+  data[1]=hostname
+  data[2]=protocol
+  modem.send(os.getenv("node_uuid"),ports["dns_lookup"],"dnslookup",si,data)
+  log("Stated dns_lookup...")
+  local start_time=computer.uptime()
+  while true do
+    local id,_,from,port,_,mtype,rsi,data=event.pullMultiple(1,"modem","interrupted")
+    if id=="interrupted" then
+      break
+    else
+      if port==ports["dns_lookup"] and from==os.getenv("n_uuid") and mtype=="dnslookup" then
+        rsi=ser.unserialize(rsi)
+        if not rsi["f"] then
+          log("DNS lookup received SessionInfo with f=false/nil - Resuming lookup",1)
+        else
+          statusCode=data[3]
+          if statusCode==1 then
+            log("Lookup completed, took "..computer.uptime()-start_time)
+            --add ip(tired)
+          end
         end
       end
     end
@@ -196,7 +230,7 @@ function mnp.connect(sessionTemplate,attempts,timeout) --client
         log("Connection returned unknown code",2)
         return false
       end
-    else end
+    else end --timeout/other stuff
   end
   log("Cannot connect",1)
   return false
@@ -209,4 +243,10 @@ function mnp.connection(si,data,connectedList) --server
   data={1}
   si["r"]=true
   modem.send(si[c-2],"connection",ser.serialize(si),ser.serialize(data))
+end
+function mnp.send(to_ip,data)
+
+end
+function mnp.receive(from_ip,a,t)
+
 end
