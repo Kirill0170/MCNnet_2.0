@@ -6,6 +6,7 @@ local component=require("component")
 local computer=require("computer")
 local ser=require("serialization")
 local modem=component.modem
+local thread=require("thread")
 local event=require("event")
 local ip=require("ipv2")
 local gpu=component.gpu
@@ -82,7 +83,6 @@ function mnp.dnsService() --SERVER USAGE ONLY(DEPRECATED)
     repeat
       local _,_,from,port,_,mtype,si,data=event.pull("modem")
       if port==ports["dns_lookup"] and mtype=="dnslookup" then
-        
       end
     until err
   else return false end
@@ -110,6 +110,10 @@ function log(text,crit)
     file:close()
     error("Fatal error occured in runtime,see log file")
   else end
+end
+function timer(time,name)
+  os.sleep(time)
+  computer.pushSignal("timeout",name)
 end
 function mnp.crash(reason)
   modem.open(ports["mncp_err"])
@@ -152,16 +156,21 @@ function mnp.register(a,t)
   if not connect then return false end
   return true
 end
-function mnp.search(to_ip)--NO ATTEMPTS HANDLING
+function mnp.search(to_ip,searchTime)
   if not to_ip then return false end
+  if not searchTime then searchTime=300 end
+  local timerName="mnp search timer" --feel free to change
   local si=ser.serialize(mnp.newSession(to_ip))
   modem.send(os.getenv("node_uuid"),ports["mnp_srch"],"search",si)
   log("Stated search...")
   local start_time=computer.uptime()
+  thread.create(timer,searchTime,timerName):detach()
   while true do
-    local id,_,from,port,_,mtype,rsi=event.pullMultiple(1,"modem","interrupted")
+    local id,name,from,port,_,mtype,rsi=event.pullMultiple(1,"modem","interrupted","timeout")
     if id=="interrupted" then
       break
+    elseif id=="timeout" then
+      if name==timerName then break end
     else
       if port==ports["mnp_srch"] and from==os.getenv("n_uuid") and mtype=="search" then
         rsi=ser.unserialize(rsi)
@@ -175,7 +184,10 @@ function mnp.search(to_ip)--NO ATTEMPTS HANDLING
         end
       end
     end
+    log("Search failed: timeout",1)
+    return false
   end
+end
 function mnp.dnslookup(hostname,protocol) --unfinished + no attempts
   if not hostname or not protocol then return false end
   local si=ser.serialize(mnp.newSession("broadcast"))

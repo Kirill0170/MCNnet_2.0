@@ -11,14 +11,7 @@ local mnp=require("mnp")
 local ip=require("ipv2")
 local dns=require("dns")
 local err = false
-busy={} --list of busy uuids(deprecated)
 --functions
-function isBusy(g_uuid)
-  for _, value in pairs(busy) do
-    if value == g_uuid then return true end
-  end
-  return false
-end
 function log(text,crit)
   local res="["..computer.uptime().."]"
   if crit==0 or not crit then
@@ -47,10 +40,7 @@ function main(from,port,mtype,si,data) --main listener
     log("Unvalid packet: no sessionInfo!",2)
   else
     local si=ser.unserialize(si)
-    --if not isBusy(si["uuid"]) then
-      thread.create(session,from,port,mtype,si,data):detach()
-      --table.insert(busy, si["uuid"])
-    --end
+    thread.create(session,from,port,mtype,si,data):detach()
   end
 end
 function session(from,port,mtype,sessionInfo,data)
