@@ -1,7 +1,8 @@
 --Mcn-net Networking Protocol for Client v2.1 EXPERIMENTAL
 --With Session Protocol v1.211 EXPERIMENTAL
 --Modem is required.
-local dolog=true --log 
+local dolog=true --log
+local saveFileName="SavedSessionTemplates" --change if you want 
 local component=require("component")
 local computer=require("computer")
 local ser=require("serialization")
@@ -126,6 +127,37 @@ function mnp.openPorts(plog)
   end
   return true
 end
+--Saving Patterns-
+function mnp.setSaveFileName(newName) saveFileName=newName end
+function mnp.loadSavedPatterns()
+  local file=io.open(saveFileName..".sst","r")
+  savedata=ser.unserialize(file:read("*a"))
+  sp=savedata
+  file:close()
+end
+function mnp.saveSavedPatterns()
+  local file=io.open(saveFileName..".sst", "w")
+  file:write(ser.serialize(sp))
+  file:close()
+end
+function mnp.getPattern(to_ip)
+  for ip,session in pairs(sp) do
+    if ip==to_ip then return ser.unserialize(session) end 
+  end
+  return nil
+end
+function mnp.getIp(domain)
+  for name,ip in pairs(sp) do
+    if name==domian then return ip end
+  end
+  return nil
+end
+function mnp.savePattern(to_ip,session)
+  sp[to_ip]=ser.serialize(session)
+end
+function mnp.saveDomain(domain,ip)
+  sp[domain]=ip
+end
 --Main-
 function mnp.register(a,t)
   if not a then a=-1 end
@@ -178,7 +210,7 @@ function mnp.search(to_ip,searchTime)
           log("Search received SessionInfo with f=false/nil - Resuming search",1)
         else
           --save session
-          sp[rsi["t"]]=rsi
+          mnp.savePattern(rsi["t"],rsi)
           log("Search completed, took "..computer.uptime()-start_time)
           return true
         end
@@ -188,7 +220,7 @@ function mnp.search(to_ip,searchTime)
     return false
   end
 end
-function mnp.dnslookup(hostname,protocol) --unfinished + no attempts
+function mnp.dnslookup(hostname,protocol) --needs testing
   if not hostname or not protocol then return false end
   local si=ser.serialize(mnp.newSession("broadcast"))
   data={}
@@ -210,7 +242,8 @@ function mnp.dnslookup(hostname,protocol) --unfinished + no attempts
           statusCode=data[3]
           if statusCode==1 then
             log("Lookup completed, took "..computer.uptime()-start_time)
-            --add ip(tired)
+            mnp.saveDomain(hostname,rsi[rsi["c"]-1])--hopefully this works
+            mnp.savePattern(rsi[rsi["c"]-1],rsi)
           end
         end
       end
