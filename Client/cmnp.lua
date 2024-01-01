@@ -11,8 +11,8 @@ local thread=require("thread")
 local event=require("event")
 local ip=require("ipv2")
 local gpu=component.gpu
-local mnp_ver="2.1 EXPERIMENTAL"
-local ses_ver="1.211 EXPERIMENTAL"
+local mnp_ver="2.2 EXPERIMENTAL"
+local ses_ver="1.22 EXPERIMENTAL"
 local mncp_ver="2.0 EXPERIMENTAL"
 local sp={} --stores patterns of sessions to some IP| "IP"=session
 local forbidden_vers={}
@@ -191,7 +191,7 @@ end
 function mnp.search(to_ip,searchTime)
   if not to_ip then return false end
   if not searchTime then searchTime=300 end
-  local timerName="mnp search timer" --feel free to change
+  local timerName="ms"..computer.uptime() --feel free to change
   local si=ser.serialize(mnp.newSession(to_ip))
   modem.send(os.getenv("node_uuid"),ports["mnp_srch"],"search",si)
   log("Stated search...")
@@ -216,22 +216,26 @@ function mnp.search(to_ip,searchTime)
         end
       end
     end
-    log("Search failed: timeout",1)
-    return false
   end
+  log("Search failed: timeout",1)
+  return false
 end
-function mnp.dnslookup(hostname,protocol) --needs testing + timeout!!
-  if not hostname or not protocol then return false end
+function mnp.dnslookup(hostname,searchTime) --needs testing + timeout!!(done?)
+  if not hostname then return false end
+  if not searchTime then searchTime=300 end
+  local timerName="mdl"..computer.uptime()
   local si=ser.serialize(mnp.newSession("broadcast"))
   data={}
   data[1]=hostname
-  data[2]=protocol
   modem.send(os.getenv("node_uuid"),ports["dns_lookup"],"dnslookup",si,data)
   log("Stated dns_lookup...")
   local start_time=computer.uptime()
+  thread.create(timer,searchTime,timerName):detach()
   while true do
-    local id,_,from,port,_,mtype,rsi,data=event.pullMultiple(1,"modem","interrupted")
+    local id,name,from,port,_,mtype,rsi,data=event.pullMultiple(1,"modem","interrupted","timeout")
     if id=="interrupted" then
+      break
+    elseif id=="timeout" and name==timerName then
       break
     else
       if port==ports["dns_lookup"] and from==os.getenv("n_uuid") and mtype=="dnslookup" then
@@ -239,18 +243,20 @@ function mnp.dnslookup(hostname,protocol) --needs testing + timeout!!
         if not rsi["f"] then
           log("DNS lookup received SessionInfo with f=false/nil - Resuming lookup",1)
         else
-          statusCode=data[3]
+          statusCode=data[2]
           if statusCode==1 then
             log("Lookup completed, took "..computer.uptime()-start_time)
-            mnp.saveDomain(hostname,rsi[rsi["c"]-1])--hopefully this works
-            mnp.savePattern(rsi[rsi["c"]-1],rsi)
+            mnp.saveDomain(hostname,data[3])--hopefully this works
+            mnp.savePattern(data[3],rsi)
           end
         end
       end
     end
   end
+  log("DNS Lookup failed: timeout", 1)
+  return false
 end
-function mnp.connect(sessionTemplate,attempts,timeout) --client
+function mnp.connect(sessionTemplate,attempts,timeout) --client (rewrite with timeout?)
   if not mnp.checkSession(sessionTemplate) or not sessionTemplate["f"] then return false end
   if not tonumber(attempts) then attempts=2 end
   if not tonumber(timeout) then timeout=5 end
@@ -269,7 +275,7 @@ function mnp.connect(sessionTemplate,attempts,timeout) --client
         log("Connection returned error code 1",1)
         return false
       elseif statusCode==2 then --Forbidden
-        log("Connection forbidden.",1)
+        log("Connection forbidden",1)
         return false
       else
         log("Connection returned unknown code",2)
@@ -289,9 +295,22 @@ function mnp.connection(si,data,connectedList) --server
   si["r"]=true
   modem.send(si[c-2],"connection",ser.serialize(si),ser.serialize(data))
 end
-function mnp.send(to_ip,data)
+function mnp.send(to_ip,mtype,data)
 
 end
-function mnp.receive(from_ip,a,t)
-
+function mnp.receive(from_ip,mtype,timeoutTime)
+  local timerName="r"..computer.uptime()
+  thread.create(timer,timeoutTime,timerName)
+  while true do
+    local id,name,_,port,_,rmtype,si,data=event.pullMultiple("modem","timeout")
+    if id=="timeout" and name==timerName then
+      break
+    else
+      si=ser.unserialize(si)
+      if from==os.getenv("node_uuid") and port==ports["mnp_data"] and rmtype==mtype and si["t"]==from_ip then
+        return data
+      end
+    end
+  end
+  return nil
 end

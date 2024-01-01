@@ -12,8 +12,8 @@ local event=require("event")
 local ip=require("ipv2")
 local dns=require("dns")
 local gpu=component.gpu
-local mnp_ver="2.1 EXPERIMENTAL"
-local ses_ver="1.21 EXPERIMENTAL"
+local mnp_ver="2.2 EXPERIMENTAL"
+local ses_ver="1.22 EXPERIMENTAL"
 local mncp_ver="2.0 EXPERIMENTAL"
 local forbidden_vers={}
 local ports={}
@@ -331,12 +331,10 @@ function mnp.dnsLookup(from,sessionInfo,data) --TODO: return error codes
       return false
     end
     --check local
-    local d_ip,d_protocol = dns.lookup(data[1])
+    local d_ip = dns.lookup(data[1])
     if d_ip then --found
-      --check protocol
-      if d_protocol~=data[2] then table.append(data,"D2")
-      else table.append(data,"D1") table.append(data,d_ip) end
-      data[3]=response
+      data[2]="D1"
+      data[3]=d_ip
       si["f"]=true
       si["r"]=true
       si[si["c"]]=ip.findUUID(d_ip)
@@ -441,12 +439,11 @@ nips["56ef:0000"]="<NodeIP>"
 ]]
 --[[ GET DNS REQUEST
 mtype="dnslookup"
-data={"<domain>,"<protocol>"}
-response data={"<domain>,"<protocol>","<statuscode>","<ipv2>"}
+data={"<domain>"}
+response data={"<domain>","<statuscode>","<ipv2>"}
 status codes:
 D1 - OK
-D2 - INCORRECT PROTOCOL
-D3 - RESOURCE DOWN
+D2 - RESOURCE DOWN
 session:
 [[
 [0]: <clientIP>
