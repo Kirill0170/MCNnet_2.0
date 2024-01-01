@@ -220,7 +220,7 @@ function mnp.search(to_ip,searchTime)
     return false
   end
 end
-function mnp.dnslookup(hostname,protocol) --needs testing
+function mnp.dnslookup(hostname,protocol) --needs testing + timeout!!
   if not hostname or not protocol then return false end
   local si=ser.serialize(mnp.newSession("broadcast"))
   data={}
