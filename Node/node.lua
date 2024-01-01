@@ -51,8 +51,6 @@ function session(from,port,mtype,sessionInfo,data)
     mnp.register(from,si)
   elseif mtype=="search" then
     mnp.search(from,si)
-  elseif mtype=="data" then
-    mnp.data(from,si,data)
   else --pass
     log("Passing packet")
     mnp.pass(port,mtype,si,data)
