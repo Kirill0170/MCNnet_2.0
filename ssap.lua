@@ -1,4 +1,4 @@
-local version="1.0 indev"
+local version="1.1 indev"
 local dolog=true
 local component=require("component")
 local computer=require("computer")
@@ -9,25 +9,25 @@ local ip=require("ipv2")
 local gpu=component.gpu
 local mnp=require("mnp")
 local ports={}
-ports["term_conn"]=2000
-ports["term_data"]=2001
-local term={}
+ports["ssap_conn"]=2000
+ports["ssap_data"]=2001
+local ssap={}
 --Util-
 function log(text,crit)
   local res="["..computer.uptime().."]"
   if dolog and crit==0 or not crit then
-    print(res.."[TERM/INFO]"..text)
+    print(res.."[SSAP/INFO]"..text)
   elseif dolog and crit==1 then
     gpu.setForeground(0xFFFF33)
-    print(res.."[TERM/WARN]"..text)
+    print(res.."[SSAP/WARN]"..text)
     gpu.setForeground(0xFFFFFF)
   elseif crit==2 then
     gpu.setForeground(0xFF3333)
-    print(res.."[TERM/ERROR]"..text)
+    print(res.."[SSAP/ERROR]"..text)
     gpu.setForeground(0xFFFFFF)
   elseif crit==3 then
     gpu.setForeground(0xFF3333)
-    print(res.."[TERM/FATAL]"..text)
+    print(res.."[SSAP/FATAL]"..text)
     gpu.setForeground(0xFFFFFF)
     local file=io.open("mnp_err.log","w")
     file:write(res..text)
@@ -39,17 +39,17 @@ function timer(time,name)
   os.sleep(time)
   computer.pushSignal("timeout",name)
 end
-function term.getVersion() return version end
+function ssap.getVersion() return version end
 --Main--
-function term.clientConnect(to_ip,timeoutTime)
+function ssap.clientConnect(to_ip,timeoutTime)
   if not to_ip or not ip.isIPv2(to_ip) then return false end
-  if not timeoutTime then timeoutTime=10 end --term connection should be fast
+  if not timeoutTime then timeoutTime=10 end --ssap connection should be fast
   local data={}
   data[1]="init"
   data[2]={version}
   data[3]={}
-  mnp.send(to_ip,"term",data)
-  local rdata=mnp.receive(to_ip,"term",timeoutTime)
+  mnp.send(to_ip,"ssap",data)
+  local rdata=mnp.receive(to_ip,"ssap",timeoutTime)
   if not rdata then
     log("Could not connect to server",1)
     return false
@@ -67,15 +67,15 @@ function term.clientConnect(to_ip,timeoutTime)
   end
   log("Could not connect to server",1)
 end
-return term
---[[ TERM PROTOCOL (refer to .term_protocol)
-"term"
+return ssap
+--[[ ssap PROTOCOL (refer to .ssap_protocol)
+"ssap"
 session: [f]:true (need to find first)
 data:
 [[
 "<mtype>",{<options>},{<data>}
 m-types:
-(s<-c)"init",{"version"="<TERM version>"},{}
+(s<-c)"init",{"version"="<ssap version>"},{}
 (s->c)"init",{"uap"=true/false},{"OK/CR"}
 (s->c)"text",{x:0,y:0,fgcol:0xFFFFFF,bgcol:"default"},{"<sample text>"}
 (s->c)"input_request",{},{}
