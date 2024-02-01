@@ -43,7 +43,7 @@ end
 function ssap.getVersion() return version end
 --Main--
 function ssap.clientConnect(to_ip,timeoutTime)
-  if not to_ip or not ip.isIPv2(to_ip) then return false end
+  if not to_ip or not ip.isIPv2(to_ip) or not cmnp.getPattern(to_ip) then return false end
   if not timeoutTime then timeoutTime=10 end --ssap connection should be fast
   local data={}
   data[1]="init"
