@@ -9,8 +9,8 @@ MCNnet uses it's own simple address system, which consists of first 4 digits of 
 Servers will be able to have domain names, like "example.com". 
 ## Servers
 Servers are special clients, which can handle connections from different clients. There are different protocols of connecting to server:  
-**[Term]** - simple terminal connection, allows basic I/O facilities.  
+**[SSAP]** - Simple Server Application Protocol, allows simple terminal connection with basic I/O facilities.  
 **[FTP]** - simple File Transfer Protocol connection, however does not support TUI.  
-**[FTerm]** - simple terminal with FTP attached to it, can download and upload files.  
-**[GSTP]** - [Planned] Graphical Site Transfer Protocol - graphical sites, as we know it.  
+**[SSAPF]** - SSAP with FTP attached to it, can download and upload files.  
+**[SSTP]** - [Planned] Simple Site Transfer Protocol - graphical sites, as we know it.  
 **[UAP]** - Universal Auth Protocol, for managing logins.
