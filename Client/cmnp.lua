@@ -6,6 +6,7 @@ local saveFileName="SavedSessionTemplates" --change if you want
 local component=require("component")
 local computer=require("computer")
 local ser=require("serialization")
+local session=require("session")
 local modem=component.modem
 local thread=require("thread")
 local event=require("event")
@@ -32,39 +33,9 @@ local mnp={}
 print("[MNP INIT]: Starting...")
 print("[MNP INIT]: MNP version "..mnp_ver)
 print("[MNP INIT]: MNCP version "..mncp_ver)
-print("[MNP INIT]: SP version "..ses_ver)
+print("[MNP INIT]: SP version "..session.ver())
 print("[MNP INIT]: IP version "..ip.ver())
 print("[MNP INIT]: Done")
---Session--------------------------------
-function mnp.checkSession(sessionInfo)
-  if not sessionInfo then return false end
-  if not ip.isUUID(sessionInfo["uuid"]) then return false end
-  if not ip.isIPv2(sessionInfo[0]) then return false end
-  if not tonumber(sessionInfo["ttl"]) then return false end
-  if not tonumber(sessionInfo["c"]) then return false end
-  if not ip.isIPv2(sessionInfo["t"]) and sessionInfo["t"]~="broadcast" then return false end
-  return true
-end
-function mnp.newSession(from_ip,to_ip,ttl)
-  if not ip.isIPv2(from_ip) then return nil end
-  if not ip.isIPv2(to_ip) or not to_ip then to_ip="broadcast" end
-  if not tonumber(ttl) then ttl=16 end
-  local newSession={}
-  newSession["uuid"]=require("uuid").next()
-  newSession["c"]=1
-  newSession["t"]=os.getenv("this_ip")
-  newSession[0]=from_ip
-  newSession["ttl"]=tonumber(ttl)
-  return newSession
-end
-function mnp.addIpToSession(sessionInfo,ip_a)
-  if not mnp.checkSession(sessionInfo) then error("[MNP SESSION ADD]: Invalid Session") end
-  if not ip.isIPv2(ip_a) then error("[MNP SESSION ADD]: Not an IP") end
-  sessionInfo[sessionInfo["c"]]=ip_a
-  sessionInfo["c"]=sessionInfo["c"]+1
-  return sessionInfo
-end
-
 --MNCP-----------------------------------
 function mnp.mncpCliService()
   if not modem.isOpen(ports["mncp_srvc"]) then modem.open(ports["mncp_srvc"]) end
@@ -73,7 +44,7 @@ function mnp.mncpCliService()
     local _,_,from,port,_,mtype,si=event.pull("modem")
     if port==ports["mncp_srvc"] and mtype=="mncp_check" then
       local to_ip=ser.unserialize(si)[0]
-      modem.send(from,ports["mncp_srvc"],"mncp_check",ser.serialize(mnp.newSession(to_ip,2)))
+      modem.send(from,ports["mncp_srvc"],"mncp_check",ser.serialize(session.newSession(to_ip,2)))
     end
   end
 end
@@ -168,7 +139,7 @@ function mnp.register(a,t)
   log("Activating registration")
   modem.setStrength(400)
   os.setenv("this_ip","0000:0000")
-  local rsi=ser.serialize(mnp.newSession())
+  local rsi=ser.serialize(session.newSession())
   if not modem.isOpen(ports["mnp_reg"]) then ct=true modem.open(ports["mnp_reg"]) end
   while not connect do
     if a>0 then ca=ca+1 end
@@ -176,7 +147,7 @@ function mnp.register(a,t)
     modem.broadcast(ports["mnp_reg"],"register",rsi)
     local _,_,from,port,dist,mtype,si=event.pull(t,"modem")
     si=ser.unserialize(si)
-    if from and port==ports["mnp_reg"] and mtype=="register" and mnp.checkSession(si) then
+    if from and port==ports["mnp_reg"] and mtype=="register" and session.checkSession(si) then
       log("Connected to "..si[0])
       connect=true
       ip.set(string.sub(si[0],1,4))
@@ -192,7 +163,7 @@ function mnp.search(to_ip,searchTime)
   if not to_ip then return false end
   if not searchTime then searchTime=300 end
   local timerName="ms"..computer.uptime() --feel free to change
-  local si=ser.serialize(mnp.newSession(to_ip))
+  local si=ser.serialize(session.newSession(to_ip))
   modem.send(os.getenv("node_uuid"),ports["mnp_srch"],"search",si)
   log("Stated search...")
   local start_time=computer.uptime()
@@ -224,7 +195,7 @@ function mnp.dnslookup(hostname,searchTime) --needs testing + timeout!!(done?)
   if not hostname then return false end
   if not searchTime then searchTime=300 end
   local timerName="mdl"..computer.uptime()
-  local si=ser.serialize(mnp.newSession("broadcast"))
+  local si=ser.serialize(session.newSession("broadcast"))
   data={}
   data[1]=hostname
   modem.send(os.getenv("node_uuid"),ports["dns_lookup"],"dnslookup",si,data)
@@ -257,7 +228,7 @@ function mnp.dnslookup(hostname,searchTime) --needs testing + timeout!!(done?)
   return false
 end
 function mnp.connect(sessionTemplate,attempts,timeout) --client (rewrite with timeout?)
-  if not mnp.checkSession(sessionTemplate) or not sessionTemplate["f"] then return false end
+  if not session.checkSession(sessionTemplate) or not sessionTemplate["f"] then return false end
   if not tonumber(attempts) then attempts=2 end
   if not tonumber(timeout) then timeout=5 end
   for att=1,attempts do
@@ -287,7 +258,7 @@ function mnp.connect(sessionTemplate,attempts,timeout) --client (rewrite with ti
   return false
 end
 function mnp.connection(si,data,connectedList) --server
-  if not mnp.checkSession(si) or not data then return false end
+  if not session.checkSession(si) or not data then return false end
   data=ser.unserialize(data)
   --banned uuids here
   table.insert(connectedList,si[0])

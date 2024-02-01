@@ -7,13 +7,13 @@ local mncplog=true --log MNCP checks?
 local component=require("component")
 local computer=require("computer")
 local ser=require("serialization")
+local session=require("session")
 local modem=component.modem
 local event=require("event")
 local ip=require("ipv2")
 local dns=require("dns")
 local gpu=component.gpu
 local mnp_ver="2.2 EXPERIMENTAL"
-local ses_ver="1.22 EXPERIMENTAL"
 local mncp_ver="2.0 EXPERIMENTAL"
 local forbidden_vers={}
 local ports={}
@@ -32,39 +32,10 @@ local mnp={}
 print("[MNP INIT]: Starting...")
 print("[MNP INIT]: MNP version "..mnp_ver)
 print("[MNP INIT]: MNCP version "..mncp_ver)
-print("[MNP INIT]: SP version "..ses_ver)
+print("[MNP INIT]: SP version "..session.ver())
 print("[MNP INIT]: IP version "..ip.ver())
 print("[MNP INIT]: DNS version "..dns.ver())
 print("[MNP INIT]: Done")
---Session--------------------------------
-function mnp.checkSession(sessionInfo)
-  if not sessionInfo then return false end
-  if not ip.isUUID(sessionInfo["uuid"]) then return false end
-  if not ip.isIPv2(sessionInfo[0]) then return false end
-  if not tonumber(sessionInfo["ttl"]) then return false end
-  if not tonumber(sessionInfo["c"]) then return false end
-  if not ip.isIPv2(sessionInfo["t"]) and sessionInfo["t"]~="broadcast" then return false end
-  return true
-end
-function mnp.newSession(from_ip,to_ip,ttl)
-  if not ip.isIPv2(from_ip) then return nil end
-  if not ip.isIPv2(to_ip) or not to_ip or to_ip~="dns_lookup" then to_ip="broadcast" end
-  if not tonumber(ttl) then ttl=16 end
-  local newSession={}
-  newSession["uuid"]=require("uuid").next()
-  newSession["c"]=1
-  newSession["t"]=to_ip
-  newSession[0]=from_ip
-  newSession["ttl"]=tonumber(ttl)
-  return newSession
-end
-function mnp.addIpToSession(sessionInfo,ip_a)
-  if not mnp.checkSession(sessionInfo) then error("[MNP SESSION ADD]: Invalid Session") end
-  if not ip.isIPv2(ip_a) then error("[MNP SESSION ADD]: Not an IP") end
-  sessionInfo[sessionInfo["c"]]=ip_a
-  sessionInfo["c"]=sessionInfo["c"]+1
-  return sessionInfo
-end
 --MNCP-----------------------------------
 function mnp.mncpService()
   local a=2 --attempts
@@ -80,7 +51,7 @@ function mnp.mncpService()
       local chk=false
       for i=0,a do
         local times=computer.uptime()
-        modem.send(n_uuid,ports["mncp_srvc"],"mncp_check",ser.serialize(mnp.newSession(os.getenv("this_ip"),n_ip,1)))
+        modem.send(n_uuid,ports["mncp_srvc"],"mncp_check",ser.serialize(session.newSession(os.getenv("this_ip"),n_ip,1)))
         local _,_,from,port,_,mtype,si=event.pull(t,"modem")
         if from~=n_ip or port~=ports["mncp_srvc"] then
           --ok
@@ -137,12 +108,12 @@ end
 function mnp.node_chkreg(from,sessionInfo)
   if not ip.isUUID(from) or not sessionInfo then return false end
   sessionInfo=ser.unserialize(sessionInfo)
-  if not mnp.checkSession(sessionInfo) then return false end
+  if not session.checkSession(sessionInfo) then return false end
   if ip.isIPv2(sessionInfo[0],true) then
     if string.sub(from,1,4)==sessionInfo[0] then
       ip.addUUID(from,true)
       log("New node: "..string.sub(from,1,4))
-      modem.send(from,ports["mnp_reg"],ser.serialize(mnp.newSession(os.getenv("this_ip"))),"ok")
+      modem.send(from,ports["mnp_reg"],ser.serialize(session.newSession(os.getenv("this_ip"))),"ok")
       return true
     else
       log("Unvalid sessionInfo: IP doesn't correspond to uuid",1)
@@ -161,7 +132,7 @@ function mnp.node_register(a,t)
   end
   if not modem.isOpen(ports["mnp_reg"]) then ct=true modem.open(ports["mnp_reg"]) end
   for i=0,a do --packetas
-    local rsi=ser.serialize(mnp.newSession(os.getenv("this_ip"),"",1))
+    local rsi=ser.serialize(session.newSession(os.getenv("this_ip"),"",1))
     modem.broadcast(ports["mnp_reg"],"register",rsi)
     local _,_,from,port,_,mtype,si=event.pull(t,"modem")
     if not from then log("[nreg seq:"..i.."]: Timeout",1)
@@ -177,7 +148,7 @@ function mnp.node_register(a,t)
 end
 
 function mnp.register(from,si,data)
-  if not from or not mnp.checkSession(si) then
+  if not from or not session.checkSession(si) then
     log("Unvalid arguments for register",2)
     return false
   end
@@ -194,7 +165,7 @@ function mnp.register(from,si,data)
     end
     ip.addUUID(from,true)
     --send succeessful registration
-    local rsi=ser.serialize(mnp.newSession(os.getenv("this_ip"),"",1))
+    local rsi=ser.serialize(session.newSession(os.getenv("this_ip"),"",1))
     modem.send(from,ports["mnp_reg"],rsi)
     log("Registered new node: "..si[0])
     return true
@@ -203,7 +174,7 @@ function mnp.register(from,si,data)
       if dns.checkHostname(data[1]) and data[2]~=nil then --TODO: check protocol
         local s_ip=string.sub(os.getenv("this_ip"),1,5)..string.sub(from,1,4)
         dns.add(s_ip,data[1],data[2])
-        local rsi=ser.serialize(mnp.newSession(os.getenv),"",1)
+        local rsi=ser.serialize(session.newSession(os.getenv),"",1)
         modem.send(from,ports["mnp_reg"],rsi)
       else --incorrect
         log("Registration failed: incorrect hostname",1)
@@ -211,7 +182,7 @@ function mnp.register(from,si,data)
       end
     else --regular
       ip.addUUID(from)
-      local rsi=ser.serialize(mnp.newSession(os.getenv("this_ip"),"",1))
+      local rsi=ser.serialize(session.newSession(os.getenv("this_ip"),"",1))
       modem.send(from,ports["mnp_reg"],rsi)
       log("Registered new server/client: "..si[0])
     end
@@ -223,7 +194,7 @@ function mnp.register(from,si,data)
 end
 
 function mnp.search(from,sessionInfo) --TODO: error codes
-  if not ip.isUUID(from) or not mnp.checkSession(sessionInfo) then
+  if not ip.isUUID(from) or not session.checkSession(sessionInfo) then
     log("Unvalid arguments for search",2)
     return false
   end
@@ -260,7 +231,7 @@ function mnp.search(from,sessionInfo) --TODO: error codes
       --write search :/
       local nodes=ip.getNodes(os.getenv("this_ip"))
       for uuid in pairs(nodes) do
-        local rsi=mnp.addIpToSession(si,ip.findIP(uuid))
+        local rsi=session.addIpToSession(si,ip.findIP(uuid))
         modem.send(uuid,ports["mnp_srch"],"search",ser.serialize(rsi))
       end
     end
@@ -282,7 +253,7 @@ function mnp.search(from,sessionInfo) --TODO: error codes
 end
 function mnp.data(from,sessionInfo,data) --outdated;do not use
   if not from then return false end
-  if not mnp.checkSession(sessionInfo) then return false end
+  if not session.checkSession(sessionInfo) then return false end
   if not sessionInfo["f"] then return false end
   local current=0
   for key,val in pairs(sessionInfo) do
@@ -294,7 +265,7 @@ function mnp.data(from,sessionInfo,data) --outdated;do not use
 end
 function mnp.data(from,sessionInfo,data)
   if not from then return false end
-  if not mnp.checkSession(sessionInfo) then return false end
+  if not session.checkSession(sessionInfo) then return false end
   if not sessionInfo["f"] then return false end
   local current=0
   for key,val in pairs(sessionInfo) do
@@ -306,7 +277,7 @@ function mnp.data(from,sessionInfo,data)
 end
 
 function mnp.dnsLookup(from,sessionInfo,data) --TODO: return error codes
-  if not ip.isUUID(from) or not mnp.checkSession(sessionInfo) or not data then
+  if not ip.isUUID(from) or not session.checkSession(sessionInfo) or not data then
     log("Unvalid arguments for dns lookup",2)
     return false
   end
@@ -347,7 +318,7 @@ function mnp.dnsLookup(from,sessionInfo,data) --TODO: return error codes
       --send to other nodes
       local nodes=ip.getNodes(os.getenv("this_ip"))
       for uuid in pairs(nodes) do
-        local rsi=mnp.addIpToSession(si,ip.findIP(uuid))
+        local rsi=session.addIpToSession(si,ip.findIP(uuid))
         modem.send(uuid,ports["mnp_srch"],"dns_lookup",ser.serialize(rsi),ser.serialize(data))
       end
     end
