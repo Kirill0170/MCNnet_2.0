@@ -8,6 +8,7 @@ local event=require("event")
 local ip=require("ipv2")
 local gpu=component.gpu
 local mnp=require("mnp")
+local cmnp=require("cmnp")
 local ports={}
 ports["ssap_conn"]=2000
 ports["ssap_data"]=2001
@@ -48,8 +49,8 @@ function ssap.clientConnect(to_ip,timeoutTime)
   data[1]="init"
   data[2]={version}
   data[3]={}
-  mnp.send(to_ip,"ssap",data)
-  local rdata=mnp.receive(to_ip,"ssap",timeoutTime)
+  cmnp.send(to_ip,"ssap",data)
+  local rdata=cmnp.receive(to_ip,"ssap",timeoutTime)
   if not rdata then
     log("Could not connect to server",1)
     return false
