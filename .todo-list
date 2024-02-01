@@ -1,3 +1,5 @@
+rewrite session and mnp
+--future--
 UAP: security protocol for mcnnet
 Package manager: connect to package servers and download/update stuff uisng version control system
-graphical sites like http with html
+SSTP: http-like websites
