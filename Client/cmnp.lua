@@ -269,7 +269,13 @@ function mnp.server_connection(si,data,connectedList) --server
   modem.send(si["route"][#si["route"]-1],"connection",ser.serialize(si),ser.serialize(data))
 end
 function mnp.send(to_ip,mtype,data)
-
+  if not mtype then mtype="data" end
+  if not data then data={} end
+  local si=mnp.getPattern(to_ip)
+  if not si then return false end
+  si["r"]=false
+  to_uuid=os.getenv("node_uuid")
+  modem.send(to_uuid,ports["mnp_data"],mtype,data)
 end
 function mnp.receive(from_ip,mtype,timeoutTime)
   local timerName="r"..computer.uptime()
