@@ -149,7 +149,7 @@ function mnp.node_register(a,t) --todo: rewrite this using timer
   return true
 end
 
-function mnp.register(from,si,data) --REWORK REQUIRED: NO MTYPE USAGE!
+function mnp.register(from,si,data) --buggy
   if not from or not session.checkSession(si) then
     log("Unvalid arguments for register",2)
     return false
@@ -168,7 +168,7 @@ function mnp.register(from,si,data) --REWORK REQUIRED: NO MTYPE USAGE!
     ip.addUUID(from,true)
     --send succeessful registration
     local rsi=ser.serialize(session.newSession(os.getenv("this_ip"),"",1))
-    modem.send(from,ports["mnp_reg"],rsi)
+    modem.send(from,ports["mnp_reg"],"register",rsi)
     log("Registered new node: "..si[0])
     return true
   elseif ip.isIPv2(si["route"][0]) then --client/server
@@ -177,7 +177,7 @@ function mnp.register(from,si,data) --REWORK REQUIRED: NO MTYPE USAGE!
         local s_ip=string.sub(os.getenv("this_ip"),1,5)..string.sub(from,1,4)
         dns.add(s_ip,data[1],data[2])
         local rsi=ser.serialize(session.newSession(os.getenv),"",1)
-        modem.send(from,ports["mnp_reg"],rsi)
+        modem.send(from,ports["mnp_reg"],"register",rsi)
       else --incorrect
         log("Registration failed: incorrect hostname",1)
         return false
@@ -185,7 +185,7 @@ function mnp.register(from,si,data) --REWORK REQUIRED: NO MTYPE USAGE!
     else --regular
       ip.addUUID(from)
       local rsi=ser.serialize(session.newSession(os.getenv("this_ip"),"",1))
-      modem.send(from,ports["mnp_reg"],rsi)
+      modem.send(from,ports["mnp_reg"],"register",rsi)
       log("Registered new server/client: "..si["route"][0])
     end
   else
