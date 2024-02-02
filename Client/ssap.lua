@@ -47,8 +47,9 @@ function ssap.clientConnect(to_ip,timeoutTime)
   if not timeoutTime then timeoutTime=10 end --ssap connection should be fast
   local data={}
   data[1]="init"
-  data[2]={version}
+  data[2]={}
   data[3]={}
+  data[2]["version"]=version
   cmnp.send(to_ip,"ssap",data)
   local rdata=cmnp.receive(to_ip,"ssap",timeoutTime)
   if not rdata then
@@ -67,6 +68,37 @@ function ssap.clientConnect(to_ip,timeoutTime)
     end
   end
   log("Could not connect to server",1)
+end
+function ssap.serverConnectionManager() --no UAP support
+  log("Started SSAP Connection Manager")
+  while true do
+    local id,_,from,port,_,mtype,si,data=event.pullMultiple("modem","interrupted","ssap_stopCM")
+    if id=="interrupted" then
+      log("CM interrupted",2)
+      break 
+    elseif id=="ssap_stopCM" then
+      log("Stopping Connection Manager")
+      break
+    else
+      if mtype=="ssap" then
+        data=ser.unserialze(data)
+        if data[1]=="init" then
+          rdata={}
+          rdata[1]="init"
+          rdata[2]={}
+          rdata[2]["uap"]=false --UAP
+          local to_ip=ser.unserialize(si)["route"][0]
+          if data[2]["version"]==version and then
+            rdata[3]={"OK"}
+            cmnp.sendBack("ssap",ser.unserialize(si),ser.serialize(data))
+          else
+            rdata[3]={"CR"}
+            cmnp.sendBack("ssap",ser.unserialize(si),ser.serialize(data))
+          end
+        end
+      end
+    end
+  end
 end
 return ssap
 --[[ ssap PROTOCOL (refer to .ssap_protocol)
