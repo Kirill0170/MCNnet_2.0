@@ -13,7 +13,6 @@ local event=require("event")
 local ip=require("ipv2")
 local gpu=component.gpu
 local mnp_ver="2.2 EXPERIMENTAL"
-local ses_ver="1.22 EXPERIMENTAL"
 local mncp_ver="2.0 EXPERIMENTAL"
 local sp={} --stores patterns of sessions to some IP| "IP"=session
 local forbidden_vers={}
@@ -43,7 +42,7 @@ function mnp.mncpCliService()
   while true do
     local _,_,from,port,_,mtype,si=event.pull("modem")
     if port==ports["mncp_srvc"] and mtype=="mncp_check" then
-      local to_ip=ser.unserialize(si)[0]
+      local to_ip=ser.unserialize(si)["route"][0]
       modem.send(from,ports["mncp_srvc"],"mncp_check",ser.serialize(session.newSession(to_ip,2)))
     end
   end
@@ -87,7 +86,7 @@ function timer(time,name)
   os.sleep(time)
   computer.pushSignal("timeout",name)
 end
-function mnp.crash(reason)
+function mnp.crash(reason) --do not use
   modem.open(ports["mncp_err"])
   modem.broadcast(ports["mncp_err"],"crash","client",reason)
 end
@@ -148,9 +147,9 @@ function mnp.register(a,t)
     local _,_,from,port,dist,mtype,si=event.pull(t,"modem")
     si=ser.unserialize(si)
     if from and port==ports["mnp_reg"] and mtype=="register" and session.checkSession(si) then
-      log("Connected to "..si[0])
+      log("Connected to "..si["route"][0])
       connect=true
-      ip.set(string.sub(si[0],1,4))
+      ip.set(string.sub(si["route"][0],1,4))
       modem.setStrength(dist+10)
       os.setenv("node_uuid",from)--save
     end
@@ -162,7 +161,7 @@ end
 function mnp.search(to_ip,searchTime)
   if not to_ip then return false end
   if not searchTime then searchTime=300 end
-  local timerName="ms"..computer.uptime() --feel free to change
+  local timerName="ms"..computer.uptime() --feel free to change first string
   local si=ser.serialize(session.newSession(to_ip))
   modem.send(os.getenv("node_uuid"),ports["mnp_srch"],"search",si)
   log("Stated search...")
@@ -178,7 +177,7 @@ function mnp.search(to_ip,searchTime)
       if port==ports["mnp_srch"] and from==os.getenv("n_uuid") and mtype=="search" then
         rsi=ser.unserialize(rsi)
         if not rsi["f"] then
-          log("Search received SessionInfo with f=false/nil - Resuming search",1)
+          log("Search received SessionInfo with f=false/nil - Doing nothing",1)
         else
           --save session
           mnp.savePattern(rsi["t"],rsi)
@@ -212,7 +211,7 @@ function mnp.dnslookup(hostname,searchTime) --needs testing + timeout!!(done?)
       if port==ports["dns_lookup"] and from==os.getenv("n_uuid") and mtype=="dnslookup" then
         rsi=ser.unserialize(rsi)
         if not rsi["f"] then
-          log("DNS lookup received SessionInfo with f=false/nil - Resuming lookup",1)
+          log("DNS lookup received SessionInfo with f=false/nil - Doing nothing",1)
         else
           statusCode=data[2]
           if statusCode==1 then
@@ -257,14 +256,17 @@ function mnp.connect(sessionTemplate,attempts,timeout) --client (rewrite with ti
   log("Cannot connect",1)
   return false
 end
-function mnp.connection(si,data,connectedList) --server
+function mnp.server_connection(si,data,connectedList) --server
   if not session.checkSession(si) or not data then return false end
   data=ser.unserialize(data)
   --banned uuids here
-  table.insert(connectedList,si[0])
+  for k,v in pairs(connectedList) do
+    if v==si["route"][0] then return false end
+  end
+  table.insert(connectedList,si["route"][0])
   data={1}
   si["r"]=true
-  modem.send(si[c-2],"connection",ser.serialize(si),ser.serialize(data))
+  modem.send(si["route"][#si["route"]-1],"connection",ser.serialize(si),ser.serialize(data))
 end
 function mnp.send(to_ip,mtype,data)
 
