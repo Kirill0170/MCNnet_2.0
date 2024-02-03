@@ -1,3 +1,4 @@
+# IT IS STILL UNDER DEVELOPMENT. NOTHING IS USABLE YET
 # MCNnet_2.0
 Advanced node networking for Open Computers, still under active development.
 
