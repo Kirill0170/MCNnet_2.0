@@ -20,6 +20,7 @@ function ip.setMode(g_mode)
 end
 
 function ip.isIPv2(g_ip,nodechk)--nodechk for checking if node
+  if not g_ip then return false end
   local pt="^%x%x%x%x:%x%x%x%x$"
   local pt2="^%x%x%x%x:0000$"
   if nodechk then
