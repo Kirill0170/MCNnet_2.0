@@ -275,12 +275,13 @@ function mnp.send(to_ip,mtype,data)
   if not si then return false end
   si["r"]=false
   to_uuid=os.getenv("node_uuid")
-  modem.send(to_uuid,ports["mnp_data"],mtype,ser.serialize(si),data)
+  modem.send(to_uuid,ports["mnp_data"],mtype,ser.serialize(si),ser.serialize(data))
 end
 function mnp.sendBack(mtype,si,data)
   if not session.checkSession(si) then return false end
   si["r"]=true
-  modem.send(si["route"][#si["route"]-1],ports["mnp_data"],mtype,ser.serialize(si),data)
+  if not data then data={} end
+  modem.send(si["route"][#si["route"]-1],ports["mnp_data"],mtype,ser.serialize(si),ser.serialize(data))
 end
 function mnp.receive(from_ip,mtype,timeoutTime)
   local timerName="r"..computer.uptime()
@@ -292,9 +293,10 @@ function mnp.receive(from_ip,mtype,timeoutTime)
     else
       si=ser.unserialize(si)
       if from==os.getenv("node_uuid") and port==ports["mnp_data"] and rmtype==mtype and si["t"]==from_ip then
-        return data
+        return ser.unserialize(data)
       end
     end
   end
   return nil
 end
+return mnp

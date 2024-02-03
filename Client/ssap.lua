@@ -1,4 +1,5 @@
 local version="1.1 indev"
+local filename="app.lua"
 local dolog=true
 local component=require("component")
 local computer=require("computer")
@@ -88,17 +89,46 @@ function ssap.serverConnectionManager() --no UAP support
           rdata[2]={}
           rdata[2]["uap"]=false --UAP
           local to_ip=ser.unserialize(si)["route"][0]
-          if data[2]["version"]==version and then
+          if data[2]["version"]==version then
             rdata[3]={"OK"}
-            cmnp.sendBack("ssap",ser.unserialize(si),ser.serialize(data))
+            cmnp.sendBack("ssap",si,rdata)
+            ssap.application(filename,to_ip)
           else
             rdata[3]={"CR"}
-            cmnp.sendBack("ssap",ser.unserialize(si),ser.serialize(data))
+            cmnp.sendBack("ssap",si,rdata)
           end
         end
       end
     end
   end
+end
+function ssap.application(filepath,to_ip)
+  if not require("filesystem").exists(filepath) then
+    log("Could not open application file",3)
+  end
+  local app=require(filepath)
+  log("Starting SSAP application...")
+  app.main(to_ip)
+end
+function ssap.send(to_ip,data)
+  cmnp.send(to_ip,"ssap",data)
+end
+function ssap.getInput(from_ip,timeoutTime,label)
+  if not ip.isIPv2(from_ip) then return nil end
+  if not tonumber(timeoutTime) then timeoutTime=120 end
+  sdata={"input_request",{},{}}
+  if label then sdata[2]["label"]=label end
+  sdata[2]["timeout"]=timeoutTime
+  cmnp.send(from_ip,"ssap",sdata)
+  --no local
+  local rdata=cmnp.receive(from_ip,"ssap",timeoutTime)
+  if rdata[1]=="input_response" and rdata[3][1]~=nil then
+    return rdata[3][1]
+  end
+  return nil
+end
+function ssap.disconnect(to_ip)
+  cmnp.send(to_ip,"ssap",{"exit",{},{}})
 end
 return ssap
 --[[ ssap PROTOCOL (refer to .ssap_protocol)
@@ -111,6 +141,7 @@ m-types:
 (s<-c)"init",{"version"="<ssap version>"},{}
 (s->c)"init",{"uap"=true/false},{"OK/CR"}
 (s->c)"text",{x:0,y:0,fgcol:0xFFFFFF,bgcol:"default"},{"<sample text>"}
-(s->c)"input_request",{},{}
+(s->c)"input_request",{"label"="<nil/string>","timeout"=<int>},{}
 (s<-c)"input_response",{},{"<input>"}
+(s->c)"exit",{},{}
 ]]
