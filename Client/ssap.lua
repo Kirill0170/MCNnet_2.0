@@ -130,6 +130,43 @@ end
 function ssap.disconnect(to_ip)
   cmnp.send(to_ip,"ssap",{"exit",{},{}})
 end
+function ssap.clientConnection(server_ip,timeoutTime)--0: disconnected 1: server timeout 2: client timeout
+  local gpu=require("component").gpu
+  local term=require("term")
+  if not tonumber(timeoutTime) then timeoutTime=60 end
+  while true do
+    local rdata=cmnp.receive(server_ip,"ssap",timeoutTime)
+    if not rdata then--disconnect
+      log("Disconnected: Server timeouted",1)
+      return 1
+    end
+    if rdata[1]=="exit" then
+      log("Disconnected: exit")
+      return 0
+    elseif rdata[1]=="text" then
+      if rdata[2]["bg_color"] then gpu.setBackground(rdata[2]["bg_color"]) end
+      if rdata[2]["fg_color"] then gpu.setForeground(rdata[2]["fg_color"]) end
+      if rdata[2]["x"] and rdata[2]["y"] then
+        term.setCursor(tonumber(rdata[2]["x"]),tonumber(rdata[2]["y"]))
+        term.write(rdata[3][1])
+        term.setCursor(1,tonumber(rdata[2]["y"])+1)--next line(needed??)
+      else
+        print(rdata[3][1])
+      end
+    elseif rdata[1]=="input_request" then
+      if rdata[2]["label"] then term.write(rdata[2]["label"]) end
+      local time=computer.uptime()
+      local input=io.read()
+      if computer.uptime()-time>tonumber(rdata[2]["timeout"]) then --check if timeouted
+        log("Disconnected: Client timeout",1)
+        return 2 end --return to end XD
+      local sdata={"input_response",{},{input}}
+      cmnp.send(server_ip,"ssap",sdata)
+    else
+      log("Unknown ssap header: "..tostring(rdata[1]),1S)
+    end
+  end
+end
 return ssap
 --[[ ssap PROTOCOL (refer to .ssap_protocol)
 "ssap"
