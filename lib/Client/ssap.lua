@@ -8,7 +8,6 @@ local thread=require("thread")
 local event=require("event")
 local ip=require("ipv2")
 local gpu=component.gpu
-local mnp=require("mnp")
 local cmnp=require("cmnp")
 local ports={}
 ports["ssap_conn"]=2000
