@@ -130,8 +130,8 @@ function mnp.saveDomain(domain,ip)
 end
 --Main-
 function mnp.register(a,t)
-  if not a then a=-1 end
-  if not t then t=2 end
+  if not tonumber(a) then a=-1 end
+  if not tonumber(t) then t=2 end
   local ca=0 --current attempt
   local ct=false --close port?
   local connect=false
