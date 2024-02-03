@@ -1,7 +1,7 @@
 --Mcn-net Networking Protocol for Client v2.1 EXPERIMENTAL
 --With Session Protocol v1.211 EXPERIMENTAL
 --Modem is required.
-local dolog=true --log
+local dolog=false --log
 local saveFileName="SavedSessionTemplates" --change if you want 
 local component=require("component")
 local computer=require("computer")
@@ -29,12 +29,14 @@ ports["mftp_srvc"]=1008
 ports["dns_lookup"]=1009
 local mnp={}
 --init-----------------------------------
-print("[MNP INIT]: Starting...")
-print("[MNP INIT]: MNP version "..mnp_ver)
-print("[MNP INIT]: MNCP version "..mncp_ver)
-print("[MNP INIT]: SP version "..session.ver())
-print("[MNP INIT]: IP version "..ip.ver())
-print("[MNP INIT]: Done")
+if dolog then
+  print("[MNP INIT]: Starting...")
+  print("[MNP INIT]: MNP version "..mnp_ver)
+  print("[MNP INIT]: MNCP version "..mncp_ver)
+  print("[MNP INIT]: SP version "..session.ver())
+  print("[MNP INIT]: IP version "..ip.ver())
+  print("[MNP INIT]: Done")
+end
 --MNCP-----------------------------------
 function mnp.mncpCliService()
   if not modem.isOpen(ports["mncp_srvc"]) then modem.open(ports["mncp_srvc"]) end
@@ -97,6 +99,12 @@ function mnp.openPorts(plog)
   end
   return true
 end
+function mnp.toggleLog(change)
+  if change==true or change==false then 
+    dolog=change
+    return true
+  else return false end
+end
 --Saving Patterns-
 function mnp.setSaveFileName(newName) saveFileName=newName end
 function mnp.loadSavedPatterns()
@@ -129,7 +137,7 @@ function mnp.saveDomain(domain,ip)
   sp[domain]=ip
 end
 --Main-
-function mnp.register(a,t)
+function mnp.register(a,t)--what a shame
   if not tonumber(a) then a=-1 end
   if not tonumber(t) then t=2 end
   local ca=0 --current attempt
@@ -145,20 +153,22 @@ function mnp.register(a,t)
     if ca>a and a>0 then break end
     modem.broadcast(ports["mnp_reg"],"register",rsi)
     local _,_,from,port,dist,mtype,si=event.pull(t,"modem")
-    si=ser.unserialize(si)
-    if from and port==ports["mnp_reg"] and mtype=="register" and session.checkSession(si) then
-      log("Connected to "..si["route"][0])
-      connect=true
-      ip.set(string.sub(si["route"][0],1,4))
-      modem.setStrength(dist+10)
-      os.setenv("node_uuid",from)--save
+    if from and si then
+      si=ser.unserialize(si)
+      if port==ports["mnp_reg"] and mtype=="register" and session.checkSession(si) then
+        log("Connected to "..si["route"][0])
+        connect=true
+        ip.set(string.sub(si["route"][0],1,4))
+        modem.setStrength(dist+10)
+        os.setenv("node_uuid",from)--save
+      end
     end
   end
   if ct then modem.close(ports["mnp_reg"]) end
   if not connect then return false end
   return true
 end
-function mnp.search(to_ip,searchTime)
+function mnp.search(to_ip,searchTime)--check si
   if not to_ip then return false end
   if not searchTime then searchTime=300 end
   local timerName="ms"..computer.uptime() --feel free to change first string
@@ -190,7 +200,7 @@ function mnp.search(to_ip,searchTime)
   log("Search failed: timeout",1)
   return false
 end
-function mnp.dnslookup(hostname,searchTime) --needs testing + timeout!!(done?)
+function mnp.dnslookup(hostname,searchTime) --fix: check si
   if not hostname then return false end
   if not searchTime then searchTime=300 end
   local timerName="mdl"..computer.uptime()
