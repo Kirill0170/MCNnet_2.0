@@ -8,6 +8,7 @@ local thread=require("thread")
 local event=require("event")
 local gpu=component.gpu
 local mnp=require("mnp")
+local session=require("session")
 local ip=require("ipv2")
 local dns=require("dns")
 local err = false
@@ -46,7 +47,8 @@ end
 function session(from,port,mtype,sessionInfo,data)
   if not sessionInfo then return false end
   si=ser.unserialize(sessionInfo)
-  if not mnp.checkSession(si) then log("Unvalid SessionInfo received",1) return false end
+  if not session.checkSession(si) then log("Unvalid SessionInfo received",1) return false end
+  if port==1003 then return false end
   if mtype=="register" then
     mnp.register(from,si)
   elseif mtype=="search" then

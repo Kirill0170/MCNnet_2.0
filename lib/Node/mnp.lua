@@ -103,6 +103,9 @@ function mnp.openPorts(plog)
   end
   return true
 end
+function mnp.getPort(keyword)
+  return ports[keyword]
+end
 --Main-
 --reg--
 function mnp.node_chkreg(from,sessionInfo)
