@@ -5,9 +5,9 @@ function session.ver() return version end
 function session.checkSession(sessionInfo)
     if not sessionInfo then return false end
     if not ip.isUUID(sessionInfo["uuid"]) then return false end
-    if not ip.isIPv2(sessionInfo[0]) then return false end
-    if not tonumber(sessionInfo["ttl"]) then return false end
     if not sessionInfo["route"] then return false end
+    if not ip.isIPv2(sessionInfo["route"][0]) then return false end
+    if not tonumber(sessionInfo["ttl"]) then return false end
     if not ip.isIPv2(sessionInfo["t"]) and sessionInfo["t"]~="broadcast" and sessionInfo["t"]~="dns_lookup" then return false end
     return true
 end
