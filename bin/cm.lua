@@ -1,4 +1,4 @@
---MNP CONNECTION MANAGER with TUI for client
+--MNP CONNECTION MANAGER for client
 local ver="INDEV 0.1"
 local mnp=require("cmnp")
 local term=require("term")
