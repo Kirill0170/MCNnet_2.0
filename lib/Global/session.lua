@@ -13,7 +13,8 @@ function session.checkSession(sessionInfo)
 end
 function session.newSession(from_ip,to_ip,ttl)
     if not ip.isIPv2(from_ip) then return nil end
-    if not ip.isIPv2(to_ip) or not to_ip or to_ip~="dns_lookup" then to_ip="broadcast" end
+    if to_ip=="dns_lookup" then --pass
+    elseif not ip.isIPv2(to_ip) or not to_ip then to_ip="broadcast" end
     if not tonumber(ttl) then ttl=16 end
     local newSession={}
     newSession["uuid"]=require("uuid").next()
