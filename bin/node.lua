@@ -53,6 +53,8 @@ function sessionThread(from,port,mtype,sessionInfo,data)
     mnp.register(from,si)
   elseif mtype=="search" then
     mnp.search(from,si)
+  elseif mtype=="dnslookup" then
+    mnp.dnsLookup(from,si,data)
   else --pass
     log("Passing packet")
     mnp.pass(port,mtype,si,data)
@@ -79,7 +81,7 @@ if not mnp.node_register(attempts,timeout) then log("Could not set register: che
 log("Setup MNP")
 if not mnp.openPorts() then log("Could not open ports",3) end
 log("Starting MNCP")
-mnp.mncpService()
+thread.create(mnp.mncpService):detach()
 --main
 log("Node Online!")
 

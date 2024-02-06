@@ -138,8 +138,8 @@ function mnp.saveDomain(domain,ip)
 end
 --Main-
 function mnp.register(a,t)--what a shame
-  if not tonumber(a) then a=-1 end
-  if not tonumber(t) then t=2 end
+  if not tonumber(a) or tonumber(a)<1 then a=1 end
+  if not tonumber(t) then t=10 end
   local ca=0 --current attempt
   local ct=false --close port?
   local connect=false
@@ -162,6 +162,8 @@ function mnp.register(a,t)--what a shame
         modem.setStrength(dist+10)
         os.setenv("node_uuid",from)--save
       end
+    else
+      log("Invaid packet",1)
     end
   end
   if ct then modem.close(ports["mnp_reg"]) end
