@@ -40,7 +40,6 @@ function main(from,port,mtype,si,data) --main listener
   if not si then
     log("Unvalid packet: no sessionInfo!",2)
   else
-    local si=ser.unserialize(si)
     thread.create(sessionThread,from,port,mtype,si,data):detach()
   end
 end
