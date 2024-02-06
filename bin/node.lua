@@ -49,7 +49,7 @@ function sessionThread(from,port,mtype,sessionInfo,data)
   if not session.checkSession(si) then log("Unvalid SessionInfo received",1) return false end
   if port==1003 then return false end
   if mtype=="register" then
-    mnp.register(from,si)
+    mnp.register(from,si,data)
   elseif mtype=="search" then
     mnp.search(from,si)
   elseif mtype=="dnslookup" then
