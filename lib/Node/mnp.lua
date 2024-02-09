@@ -1,5 +1,4 @@
 --Mcn-net Networking Protocol v2.1 EXPERIMENTAL
---With Session Protocol v1.21 EXPERIMENTAL
 --Modem is required.
 local dolog=true --log?
 local ttllog=true --log ttl discardment?
@@ -28,6 +27,7 @@ ports["mftp_data"]=1007
 ports["mftp_srvc"]=1008
 ports["dns_lookup"]=1009
 local mnp={}
+mnp.networkName="default" --default network name
 --init-----------------------------------
 print("[MNP INIT]: Starting...")
 print("[MNP INIT]: MNP version "..mnp_ver)
@@ -96,6 +96,7 @@ function mnp.crash(reason) --do not use
   modem.open(ports["mncp_err"])
   modem.broadcast(ports["mncp_err"],"crash","node",reason)
 end
+function mnp.setNetworkName(newname) if tostring(newname) then mnp.networkName=tostring(newname) end end
 function mnp.openPorts(plog)
   for name,port in pairs(ports) do
     if plog then log("Opening "..name) end
@@ -124,7 +125,7 @@ function mnp.node_chkreg(from,sessionInfo)
   end
 end
 
-function mnp.node_register(a,t) --todo: rewrite this using timer
+function mnp.node_register(a,t) --todo: rewrite this using timer and check for netname via data
   if not a then a=5 end
   if not t then t=2 end
   local ct=false
@@ -172,10 +173,11 @@ function mnp.register(from,si,data) --buggy
     --send succeessful registration
     local rsi=ser.serialize(session.newSession(os.getenv("this_ip"),"",1))
     modem.send(from,ports["mnp_reg"],"register",rsi)
-    log("Registered new node: "..si[0])
+    log("Registered new node: "..si["route"][0])
     return true
   elseif ip.isIPv2(si["route"][0]) then --client/server
     if data then -- DNS server [OPTIMIZATION REQUIRED]
+      log("Registering server with DNS")
       if dns.checkHostname(data[1]) and data[2]~=nil then --TODO: check protocol
         local s_ip=string.sub(os.getenv("this_ip"),1,5)..string.sub(from,1,4)
         dns.add(s_ip,data[1],data[2])
@@ -196,6 +198,34 @@ function mnp.register(from,si,data) --buggy
     return false
   end
   return true
+end
+
+function mnp.networkSearch(from,si) --allows finding
+  if not ip.isUUID(from) or not session.checkSession(si) then log("Invalid si or no from address") end
+  local rsi=session.newSession(os.getenv(this_ip),"",1)
+  modem.send(from, ports["mnp_reg"],"netsearch",ser.serialize(rsi),ser.serialize({mnp.networkName}))
+end
+
+function mnp.networkConnect(from,si,data)
+  if not ip.isUUID(from) or not session.checkSession(si) then log("Invalid si or no from address") end
+  if data then
+    if ser.unserialize(data)[1]~=mnp.networkName then return false end
+  end
+  if si["route"][0]=="0000:0000" then --client
+    local rsi=ser.serialize(session.newSession(os.getenv("this_ip")))
+    local ipstr=string.sub(os.getenv("this_ip"),1,4)..":"..string.sub(from,1,4)
+    modem.send(from,ports["mnp_reg"],"netconnect",rsi,ser.serialize({ipstr}))
+    ip.addUUID(from)
+    --confirm
+    return true
+  elseif ip.isIPv2(si["route"][0],true) then --node
+    local rsi=ser.serialize(session.newSession(os.getenv("this_ip")))
+    modem.send(from,ports["mnp_reg"],"netconnect",rsi,ser.serialize({"ok"}))
+    ip.addUUID(from,true)
+    return true
+  else
+    return false
+  end
 end
 
 function mnp.search(from,sessionInfo) --TODO: error codes
