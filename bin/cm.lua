@@ -17,6 +17,7 @@ local function help()
   cprint("MNP Client Connection Manager",0xFFCC33)
   print("Version "..ver)
   cprint("Usage: cm [options] <action> ",0x6699FF)
+  print("search - search for networks")
   print("connect <attempts> <timeout> - Connect to network")
   print("status         Current network")
   cprint("Options:",0x33CC33)
@@ -57,6 +58,33 @@ local function connect(a,t,s,p)
   mnp.register(a,t,dolog)
 end
 
+local function printDist(str1,str2)
+  local color=0xFFFFFF
+  if str2<70 then color=0x33CC33
+  elseif str<200 then color=0xFFFF33
+  elseif str<300 then color=0xFFCC33
+  else color=0xFF0000 end
+  term.write(str1)
+  gpu.setForeground(color)
+  term.write(" "..str2.." ")
+  gpu.setForeground(0xFFFFFF)
+end
+
+local function search(s,p)
+  if p==true then mnp.toggleLog(true)
+  elseif s==true then mnp.toggleLog(false) end
+  local rsi=mnp.networkSearch()
+  if not rsi then cprinnt("No networks found",0xFFCC33)
+  else
+    print("№ | Network name | distance")
+    counter=1
+    for name, info in pairs(rsi) do
+      printDist(tostring(counter).." | "..name,info[1],)
+    end
+    print("---------------------------")
+    print("")
+  end
+end
 --main
 local args,ops = shell.parse(...)
 if not args and not ops then help()
@@ -64,4 +92,5 @@ elseif ops["h"] or ops["help"] then help()
 elseif args[1]=="connect" then
   connect(args[2],args[3],ops["s"],ops["p"])
 elseif args[1]=="status" then status()
+elseif args[1]=="search" then search(ops["p"])
 else help() end 
