@@ -78,11 +78,29 @@ local function search(s,p)
   else
     print("№ | Network name | distance")
     counter=1
+    choices={}
     for name, info in pairs(rsi) do
-      printDist(tostring(counter).." | "..name,info[1],)
+      printDist(tostring(counter).." | "..name,info[2])
+      counter=counter+1
+      choice[counter]=info
     end
     print("---------------------------")
-    print("")
+    print("Select network to connect or q")
+    local exit=false
+    while not exit do
+      term.write(">")
+      local choice=io.read()
+      if choice=="q" then return false
+      elseif tonumber(choice) then
+        if tonumber(choice)>=1 and tonumber(choice)<=counter then
+          selected=tonumber(choice)
+          exit=true
+        end
+      else
+        cprint("Unknown choice. 'q' to exit.",0xFF0000)
+      end
+    end
+    --connect
   end
 end
 --main
@@ -92,5 +110,5 @@ elseif ops["h"] or ops["help"] then help()
 elseif args[1]=="connect" then
   connect(args[2],args[3],ops["s"],ops["p"])
 elseif args[1]=="status" then status()
-elseif args[1]=="search" then search(ops["p"])
+elseif args[1]=="search" then search(ops["s"],ops["p"])
 else help() end 
