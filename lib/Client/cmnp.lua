@@ -170,6 +170,57 @@ function mnp.register(a,t)--what a shame
   if not connect then return false end
   return true
 end
+
+function mnp.networkSearch(searchTime)
+  if not searchTime then searchTime=10 end
+  local res={}
+  local timerName="ns"..computer.uptime()
+  thread.create(timer,searchTime,timerName):detach()
+  while true do
+    local id,name,from,port,dist,mtype,si,data=event.pullMultiple("modem","timeout","interrupted")
+    if id=="interrupted" then break
+    elseif id=="timeout" and name==timerName then break
+    else
+      if not session.checkSession(ser.unserialize(si)) then log("Invalid session on netsearch")
+      else
+        data=ser.unserialize(data)
+        if data[1]~=nil then
+          res[data[1]]={from,dist}
+        end
+      end
+    end
+  end
+  return res
+end
+
+function mnp.networkConnectByName(from,name)
+  if not name then return false end
+  local rsi=ser.serialize(session.newSession(os.getenv("this_ip")))
+  modem.send(from,ports["mnp_reg"],"netconnect",rsi,ser.serialize({name}))
+  while true do
+    local _,this,rfrom,port,_,mtype,si,data=event.pull(5,"modem")
+    if not rfrom then
+      log("Node timeouted")
+      return false
+    elseif port~=ports["mnp_reg"] or rfrom~=from then pass
+  else
+    data=ser.unserialize(data)
+    if name==data[1] then
+      log("Connected to "..name)
+      if not ip.set(string.sub(from,1,4)..":"..string.sub(this,1,4)) then
+        log("Couldn't set IP, please debug!")
+        return false
+      else
+        log("IP is set")
+        return true
+      end
+    else
+      log("Unexpected network name received")
+      return false
+    end
+  end
+end
+
 function mnp.search(to_ip,searchTime)--check si
   if not to_ip then return false end
   if not searchTime then searchTime=300 end
