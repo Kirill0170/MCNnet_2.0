@@ -1,4 +1,5 @@
 --Node (experimental)
+local netname="Internet" --change this: network name
 local component=require("component")
 local computer=require("computer")
 local ser=require("serialization")
@@ -79,6 +80,7 @@ log("Searching for nodes... Should take "..timeout*attempts.." seconds")
 if not mnp.node_register(attempts,timeout) then log("Could not set register: check if ip is set?",3) end
 log("Setup MNP")
 if not mnp.openPorts() then log("Could not open ports",3) end
+mnp.setNetworkName(netname)
 log("Starting MNCP")
 thread.create(mnp.mncpService):detach()
 --main
