@@ -83,9 +83,10 @@ local function search(s,p)
       printDist(tostring(counter).." | "..name,info[2])
       counter=counter+1
       choice[counter]=info
+      choice[counter][2]=name
     end
-    print("---------------------------")
-    print("Select network to connect or q")
+    print("------------------------------")
+    print("Select network to connect or 'q' to exit")
     local exit=false
     while not exit do
       term.write(">")
@@ -101,6 +102,8 @@ local function search(s,p)
       end
     end
     --connect
+    print("Trying to connect to "..choice[selected][2])
+    mnp.networkConnectByName(choice[selected][1],choice[selected][2])
   end
 end
 --main
