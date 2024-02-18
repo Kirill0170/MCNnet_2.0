@@ -23,7 +23,8 @@ function dns.init(reset) --clears!
   file2:close()
 end
 function dns.add(ip,hostname,protocol)
-  if not protocol or not ip or not hostname then return false end
+  if not ip or not hostname then return false end
+  if not protocol then protocol="generic" end
   local file = io.open(filename,"r")
   local t=ser.unserialize(file:read("*a"))
   file:close()
