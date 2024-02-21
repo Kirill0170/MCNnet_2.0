@@ -137,6 +137,7 @@ function mnp.saveDomain(domain,ip)
   sp[domain]=ip
 end
 --Main-
+--------TO BE DELETED-------------------------------------------------
 function mnp.register(a,t)--what a shame
   if not tonumber(a) or tonumber(a)<1 then a=1 end
   if not tonumber(t) then t=10 end
@@ -170,7 +171,7 @@ function mnp.register(a,t)--what a shame
   if not connect then return false end
   return true
 end
-
+----------------------------------------------------------------------
 function mnp.networkSearch(searchTime)
   if not searchTime then searchTime=10 end
   local res={}
