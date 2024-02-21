@@ -223,12 +223,14 @@ function mnp.networkConnect(from,si,data)
     --dns
     if data["dns_hostname"] then
       if dns.checkHostname(data["dns_hostname"]) then
-        dns.add(ip.findIP(from),data["dns_hostname"],data["dns_protocol"])
+        dns.add(ip.findIP(from),data["dns_hostname"],data["dns_protocol"]) --risky
       end
     end
     --confirm
     return true
   elseif ip.isIPv2(si["route"][0],true) then --node
+    if ip.findIP(from) then --connected already
+      return true end
     local rsi=ser.serialize(session.newSession(os.getenv("this_ip")))
     modem.send(from,ports["mnp_reg"],"netconnect",rsi,ser.serialize({"ok"}))
     ip.addUUID(from,true)
@@ -246,7 +248,7 @@ function mnp.nodeConnect(connectTime) --on node start, call this
   thread.create(timer,connectTime,timerName):detach()
   local exit=false
   while not exit do
-    modem.broadcast(ports["mnp_reg"],"netconnect",rsi)
+    modem.broadcast(ports["mnp_reg"],"netconnect",rsi,ser.serialize({mnp.networkName}))
     local id,name,from,port,dist,mtype,si=event.pullMultiple("interrupted","timeout","modem")
     if id=="timeout" or id=="interrupted" then
       exit=true
@@ -258,8 +260,9 @@ function mnp.nodeConnect(connectTime) --on node start, call this
         log("registered new node")
       end
     end
-  
-    log("debug:exit")
+  end
+  log("debug:exit")
+  return true
 end
 function mnp.search(from,sessionInfo) --TODO: error codes
   if not ip.isUUID(from) or not session.checkSession(sessionInfo) then
