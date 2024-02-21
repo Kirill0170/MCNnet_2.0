@@ -7,6 +7,7 @@ local component=require("component")
 local computer=require("computer")
 local ser=require("serialization")
 local session=require("session")
+local thread=require("thread")
 local modem=component.modem
 local event=require("event")
 local ip=require("ipv2")
