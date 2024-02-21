@@ -177,6 +177,7 @@ function mnp.networkSearch(searchTime)
   local timerName="ns"..computer.uptime()
   thread.create(timer,searchTime,timerName):detach()
   while true do
+    modem.broadcast(ports["mnp_reg"],"netsearch",ser.serialize(session.newSession()))
     local id,name,from,port,dist,mtype,si,data=event.pullMultiple("modem","timeout","interrupted")
     if id=="interrupted" then break
     elseif id=="timeout" and name==timerName then break
