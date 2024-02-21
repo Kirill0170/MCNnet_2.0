@@ -92,6 +92,10 @@ function log(text,crit)
     error("Fatal error occured in runtime,see log file")
   else end
 end
+function timer(time,name)
+  os.sleep(time)
+  computer.pushSignal("timeout",name)
+end
 function mnp.crash(reason) --do not use
   modem.open(ports["mncp_err"])
   modem.broadcast(ports["mncp_err"],"crash","node",reason)
@@ -108,7 +112,7 @@ function mnp.getPort(keyword)
   return ports[keyword]
 end
 --Main-
---reg--
+--TO BE DELETED--------------------------------------------------------------
 function mnp.node_chkreg(from,sessionInfo)
   if not ip.isUUID(from) or not sessionInfo then return false end
   if not session.checkSession(sessionInfo) then return false end
@@ -199,7 +203,7 @@ function mnp.register(from,si,data) --buggy
   end
   return true
 end
-
+---------------------------------------------------------------------------------
 function mnp.networkSearch(from,si) --allows finding
   if not ip.isUUID(from) or not session.checkSession(si) then log("Invalid si or no from address") end
   local rsi=session.newSession(os.getenv(this_ip),"",1)
@@ -216,6 +220,12 @@ function mnp.networkConnect(from,si,data)
     local ipstr=string.sub(os.getenv("this_ip"),1,4)..":"..string.sub(from,1,4)
     modem.send(from,ports["mnp_reg"],"netconnect",rsi,ser.serialize({ipstr}))
     ip.addUUID(from)
+    --dns
+    if data["dns_hostname"] then
+      if dns.checkHostname(data["dns_hostname"]) then
+        dns.add(ip.findIP(from),data["dns_hostname"],data["dns_protocol"])
+      end
+    end
     --confirm
     return true
   elseif ip.isIPv2(si["route"][0],true) then --node
@@ -228,6 +238,29 @@ function mnp.networkConnect(from,si,data)
   end
 end
 
+function mnp.nodeConnect(connectTime) --on node start, call this
+  if not tonumber(connectTime) then connectTime=10 end
+  if not ip.isIPv2(os.getenv("this_ip"),true) then return false end
+  local rsi=session.newSession()
+  local timerName="nc"..computer.uptime()
+  thread.create(timer,connectTime,timerName):detach()
+  local exit=false
+  while not exit do
+    modem.broadcast(ports["mnp_reg"],"netconnect",rsi)
+    local id,name,from,port,dist,mtype,si=event.pullMultiple("interrupted","timeout","modem")
+    if id=="timeout" or id=="interrupted" then
+      exit=true
+      log("timeout")
+    else
+      local si=ser.unserialize(si)
+      if ip.isIPv2(si["route"][0],true) then
+        ip.addUUID(from,true)
+        log("registered new node")
+      end
+    end
+  
+    log("debug:exit")
+end
 function mnp.search(from,sessionInfo) --TODO: error codes
   if not ip.isUUID(from) or not session.checkSession(sessionInfo) then
     log("Unvalid arguments for search",2)
@@ -294,18 +327,6 @@ function mnp.data(from,sessionInfo,data) --deprecated;do not use
     if val==os.getenv("this_ip") then current=key break end
   end
   local t_uuid=ip.findUUID(sessionInfo[current+1])
-  if not t_uuid then return false
-  else modem.send(t_uuid,ports["mnp_data"],"data",ser.serialize(sessionInfo),data) end
-end
-function mnp.data(from,sessionInfo,data)
-  if not from then return false end
-  if not session.checkSession(sessionInfo) then return false end
-  if not sessionInfo["f"] then return false end
-  local current=0
-  for key,val in pairs(sessionInfo["route"]) do
-    if val==os.getenv("this_ip") then current=key break end
-  end
-  local t_uuid=ip.findUUID(sessionInfo["route"][current+1])
   if not t_uuid then return false
   else modem.send(t_uuid,ports["mnp_data"],"data",ser.serialize(sessionInfo),data) end
 end
