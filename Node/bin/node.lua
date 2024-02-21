@@ -1,5 +1,6 @@
 --Node (beta)
 local netname="Internet" --change this: network name
+local searchTime=10 --how much of time for connection
 local component=require("component")
 local computer=require("computer")
 local ser=require("serialization")
@@ -36,28 +37,59 @@ local function log(text,crit)
   else end
 end
 
+local function connection(from,port,mtype,si,data)
+  if not si then return false end
+  si=ser.unserialize(si)
+  data=ser,unserialize(data)
+  if not session.checkSession(si) then 
+    log("Incorrect session field received",1)
+    return false 
+  end
+  if mtype=="netconnect" then
+    mnp.networkConnect(from,si,data)
+  elseif mtype=="netdisconnect" then
+    mnp.networkDisconnect(from)
+  elseif mtype=="netsearch" then
+    mnp.networkSearch(from,si)
+  elseif mtype=="search" then
+    mnp.search(from,si)
+  elseif mtype=="dns_lookup" then
+    mnp.dnsLookup(from,si,data)
+  else --data
+    mnp.pass(port,mtype,si,data)
+  end
+end
 
 --setup
 os.sleep(0.1)
 print("---------------------------")
-log("Node Starting - Hello World!")
+log("Node(beta) Starting - Hello World!")
 log("Checking modem")
 if not modem.isWireless() then log("Modem is recommended to be wireless, bro") end
 if modem.getStrength()<400 then log("Modem strength is recommended to be default 400",1) end
-log("Setup ipv2...")
+log("Setting up ipv2...")
 ip.setMode("NODE")
 if not ip.set(ip.gnip()) then log("Could not set node IP",3) end
-log("Setup DNS...")
+log("Setting up DNS...")
 dns.init()
-log("Registering!")
-local timeout=2
-local attempts=5
-log("Searching for nodes... Should take "..timeout*attempts.." seconds")
-if not mnp.node_register(attempts,timeout) then log("Could not set register: check if ip is set?",3) end
-log("Setup MNP")
+log("Setting up MNP..")
 if not mnp.openPorts() then log("Could not open ports",3) end
 mnp.setNetworkName(netname)
+log("Connecting to other nodes with "..netname.." name...")
+log("Should take "..searchTime.." seconds, as described in node.lua")
+if not mnp.nodeConnect(searchTime) then log("Could not set connect to other nodes: check if ip is set?",3) end
 log("Starting MNCP")
-thread.create(mnp.mncpService):detach()
+--thread.create(mnp.mncpService):detach() --uncomment this line when in prod!
 --main
 log("Node Online!")
+
+while true do
+  local id,_,from,port,dist,mtype,si,data=event.pullMultiple("interrupted","modem")
+  if id=="interrupted" then
+    mnp.closeNode()
+    break
+  else
+    thread.create(connection,from,port,mtype,si,data)
+  end
+end
+log("Program exited")
