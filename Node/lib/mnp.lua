@@ -406,25 +406,17 @@ function mnp.dnsLookup(from,sessionInfo,data) --TODO: return error codes
     end
   end
 end
-function mnp.pass(port,mtype,si,data) --node
+function mnp.pass(port,mtype,si,data)
   if not port or not mtype or not si then return false end
   local num=0
   for n,v in pairs(si["route"]) do
     if v==os.getenv("this_ip") then num=n break end
   end
-  if num>1 then --OPTIMIZATION REQUIRED
-    local to
-    if si["r"]==true then to=ip.findUUID(si["route"][tonumber(num-1)])
-    else to=ip.findUUID(si["route"][tonumber(num+1)]) end
-    if not to then log("Unsuccessful dns lookup: Unknown IP: ",2) 
-    else modem.send(to,ports["mnp_data"],"data",ser.serialize(si),data) end
-  else --local
-    local to
-    if si["r"]==true then to=ip.findUUID(si[tonumber(num-1)])
-    else to=ip.findUUID(si["route"][tonumber(num+1)]) end
-    if not to then log("Unsuccessful dns lookup: Unknown IP: ",2)
-    else modem.send(to,ports["mnp_data"],"data",ser.serialize(si),data) end
-  end
+  local to
+  if si["r"]==true then to=ip.findUUID(si[tonumber(num-1)])
+  else to=ip.findUUID(si["route"][tonumber(num+1)]) end
+  if not to then log("Unsuccessful dns lookup: Unknown IP",2)
+  else modem.send(to,ports["mnp_data"],mtype,ser.serialize(si),ser.serialize(data)) end
   return true
 end
 -------
