@@ -204,12 +204,22 @@ function mnp.register(from,si,data) --buggy
   return true
 end
 ---------------------------------------------------------------------------------
+function mnp.closeNode()
+  log("Closing node, disconnecting everyone...")
+  local nips=ip.getAll()
+  for n_ip,n_uuid in pairs(nips) do
+    local si=ser.serialize(session.newSession(ip.gnip(),n_ip,1))
+    modem.send(n_uuid,ports["mnp_reg"],"netdisconnect",si,ser.serialize({mnp.networkName}))
+  end
+end
+function mnp.networkDisconnect(from)
+  ip.deleteUUID(from)
+end
 function mnp.networkSearch(from,si) --allows finding
   if not ip.isUUID(from) or not session.checkSession(si) then log("Invalid si or no from address") end
   local rsi=session.newSession(os.getenv(this_ip),"",1)
   modem.send(from, ports["mnp_reg"],"netsearch",ser.serialize(rsi),ser.serialize({mnp.networkName}))
 end
-
 function mnp.networkConnect(from,si,data)
   if not ip.isUUID(from) or not session.checkSession(si) then log("Invalid si or no from address") end
   if data then
