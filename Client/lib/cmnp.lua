@@ -1,5 +1,4 @@
 --Mcn-net Networking Protocol for Client v2.1 EXPERIMENTAL
---With Session Protocol v1.211 EXPERIMENTAL
 --Modem is required.
 local dolog=false --log
 local saveFileName="SavedSessionTemplates" --change if you want 
@@ -203,21 +202,22 @@ function mnp.networkConnectByName(from,name)
     if not rfrom then
       log("Node timeouted")
       return false
-    elseif port~=ports["mnp_reg"] or rfrom~=from then pass
-  else
-    data=ser.unserialize(data)
-    if name==data[1] then
-      log("Connected to "..name)
-      if not ip.set(string.sub(from,1,4)..":"..string.sub(this,1,4)) then
-        log("Couldn't set IP, please debug!")
-        return false
-      else
-        log("IP is set")
-        return true
-      end
+    elseif port~=ports["mnp_reg"] or rfrom~=from then
     else
-      log("Unexpected network name received")
-      return false
+      data=ser.unserialize(data)
+      if name==data[1] then
+        log("Connected to "..name)
+        if not ip.set(string.sub(from,1,4)..":"..string.sub(this,1,4)) then
+          log("Couldn't set IP, please debug!")
+          return false
+        else
+          log("IP is set")
+          return true
+        end
+      else
+        log("Unexpected network name received")
+        return false
+      end
     end
   end
 end

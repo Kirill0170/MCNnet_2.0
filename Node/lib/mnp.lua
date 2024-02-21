@@ -259,7 +259,7 @@ function mnp.nodeConnect(connectTime) --on node start, call this
   thread.create(timer,connectTime,timerName):detach()
   local exit=false
   while not exit do
-    modem.broadcast(ports["mnp_reg"],"netconnect",rsi,ser.serialize({mnp.networkName}))
+    modem.broadcast(ports["mnp_reg"],"netconnect",ser.serialize(rsi),ser.serialize({mnp.networkName}))
     local id,name,from,port,dist,mtype,si=event.pullMultiple("interrupted","timeout","modem")
     if id=="timeout" or id=="interrupted" then
       exit=true
