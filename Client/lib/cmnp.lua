@@ -187,7 +187,7 @@ function mnp.networkSearch(searchTime) --idea: use a table to filter out used ad
       else
         data=ser.unserialize(data)
         if data[1]~=nil then
-          res[data[1]]={from,dist}
+          res[data[1]]={from,dist} --res[netname]={from,dist}
         end
       end
     end

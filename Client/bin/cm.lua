@@ -77,18 +77,18 @@ local function search(s,p)
   mnp.openPorts()
   log("Searching for networks...")
   os.setenv("this_ip","0000:0000")
-  local rsi=mnp.networkSearch()
-  if not next(rsi) then cprinnt("No networks found",0xFFCC33)
+  local rsi=mnp.networkSearch() --res[netname]={from,dist}
+  if not next(rsi) then cprint("No networks found",0xFFCC33)
   else
     print("№ | Network name | distance")
     counter=1
-    choice={}
+    choice={} --choice[num]={{from,dist},netname}
     for name, info in pairs(rsi) do
       printDist(tostring(counter).." | "..name,info[2])
-      choice[counter]=info
-      choice[counter][2]=name
+      choice[counter]={rsi[name],name}
       counter=counter+1
     end
+    log(require("serialization").serialize(choice))
     print("------------------------------")
     print("Select network to connect or 'q' to exit")
     local exit=false
@@ -97,12 +97,11 @@ local function search(s,p)
       local input=io.read()
       if input=="q" then return false
       elseif tonumber(input) then
-        if tonumber(input)>=1 and tonumber(input)<=counter then
-          if not choice[selected] then cprint("Invalid choice.",0xFF0000)
-          else
-            selected=tonumber(input)
-            exit=true
-          end
+        if tonumber(input)>=1 and tonumber(input)<=counter and choice[tonumber(input)]~=nil then
+          selected=tonumber(input)
+          exit=true
+        else
+          cprint("Invalid choice.",0xFF0000)
         end
       else
         cprint("Unknown choice. 'q' to exit.",0xFF0000)
@@ -110,7 +109,7 @@ local function search(s,p)
     end
     --connect
     print("Trying to connect to "..choice[selected][2])
-    mnp.networkConnectByName(choice[selected][1],choice[selected][2])
+    mnp.networkConnectByName(choice[selected][1][1],choice[selected][2])
   end
 end
 --main
