@@ -40,7 +40,7 @@ end
 local function connection(from,port,mtype,si,data)
   if not si then return false end
   si=ser.unserialize(si)
-  data=ser,unserialize(data)
+  if data then data=ser.unserialize(data) end
   if not session.checkSession(si) then 
     log("Incorrect session field received",1)
     return false 

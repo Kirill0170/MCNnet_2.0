@@ -218,7 +218,7 @@ function mnp.networkDisconnect(from)
 end
 function mnp.networkSearch(from,si) --allows finding
   if not ip.isUUID(from) or not session.checkSession(si) then log("Invalid si or no from address") end
-  local rsi=session.newSession(os.getenv(this_ip),"",1)
+  local rsi=session.newSession(os.getenv("this_ip"),"",1)
   modem.send(from, ports["mnp_reg"],"netsearch",ser.serialize(rsi),ser.serialize({mnp.networkName}))
 end
 function mnp.networkConnect(from,si,data)

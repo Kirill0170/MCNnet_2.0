@@ -66,36 +66,43 @@ local function printDist(str1,str2)
   else color=0xFF0000 end
   term.write(str1)
   gpu.setForeground(color)
-  term.write(" "..str2.." ")
+  term.write(" "..str2.."\n")
   gpu.setForeground(0xFFFFFF)
 end
 
 local function search(s,p)
   if p==true then mnp.toggleLog(true)
   elseif s==true then mnp.toggleLog(false) end
+  log("Opening ports..")
+  mnp.openPorts()
+  log("Searching for networks...")
+  os.setenv("this_ip","0000:0000")
   local rsi=mnp.networkSearch()
-  if not rsi then cprinnt("No networks found",0xFFCC33)
+  if not next(rsi) then cprinnt("No networks found",0xFFCC33)
   else
     print("№ | Network name | distance")
     counter=1
-    choices={}
+    choice={}
     for name, info in pairs(rsi) do
       printDist(tostring(counter).." | "..name,info[2])
-      counter=counter+1
       choice[counter]=info
       choice[counter][2]=name
+      counter=counter+1
     end
     print("------------------------------")
     print("Select network to connect or 'q' to exit")
     local exit=false
     while not exit do
       term.write(">")
-      local choice=io.read()
-      if choice=="q" then return false
-      elseif tonumber(choice) then
-        if tonumber(choice)>=1 and tonumber(choice)<=counter then
-          selected=tonumber(choice)
-          exit=true
+      local input=io.read()
+      if input=="q" then return false
+      elseif tonumber(input) then
+        if tonumber(input)>=1 and tonumber(input)<=counter then
+          if not choice[selected] then cprint("Invalid choice.",0xFF0000)
+          else
+            selected=tonumber(input)
+            exit=true
+          end
         end
       else
         cprint("Unknown choice. 'q' to exit.",0xFF0000)
