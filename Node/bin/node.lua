@@ -68,8 +68,7 @@ log("Checking modem")
 if not modem.isWireless() then log("Modem is recommended to be wireless, bro") end
 if modem.getStrength()<400 then log("Modem strength is recommended to be default 400",1) end
 log("Setting up ipv2...")
-ip.setMode("NODE")
-if not ip.set(ip.gnip()) then log("Could not set node IP",3) end
+if not ip.set(ip.gnip(),true) then log("Could not set node IP",3) end
 log("Setting up DNS...")
 dns.init()
 log("Setting up MNP..")
