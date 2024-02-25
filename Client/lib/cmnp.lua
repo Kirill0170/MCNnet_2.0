@@ -229,6 +229,10 @@ function mnp.networkConnectByName(from,name)
   end
 end
 
+function mnp.disconnect()
+   modem.send(os.getenv("node_uuid"),ports["mnp_reg"],"netdisconnect",ser.serialize(session.newSession()))
+end
+
 function mnp.search(to_ip,searchTime)--check si
   if not to_ip then return false end
   if not searchTime then searchTime=300 end
