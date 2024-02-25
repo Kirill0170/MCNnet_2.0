@@ -42,7 +42,7 @@ function ip.set(g_ip,node)
       os.setenv("this_ip",g_ip)
       return true
     else return false end
-  else MODE=="CLIENT" or MODE=="SERVER" then
+  else
     if ip.isIPv2(g_ip) then
       os.setenv("this_ip",g_ip)
       return true
