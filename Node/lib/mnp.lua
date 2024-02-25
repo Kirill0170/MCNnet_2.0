@@ -224,12 +224,12 @@ end
 function mnp.networkConnect(from,si,data)
   if not ip.isUUID(from) or not session.checkSession(si) then log("Invalid si or no from address") end
   if data then
-    if ser.unserialize(data)[1]~=mnp.networkName then return false end
+    if data[1]~=mnp.networkName then return false end
   end
   if si["route"][0]=="0000:0000" then --client
     local rsi=ser.serialize(session.newSession(os.getenv("this_ip")))
     local ipstr=string.sub(os.getenv("this_ip"),1,4)..":"..string.sub(from,1,4)
-    modem.send(from,ports["mnp_reg"],"netconnect",rsi,ser.serialize({ipstr}))
+    modem.send(from,ports["mnp_reg"],"netconnect",rsi,ser.serialize({mnp.networkName,ipstr}))
     ip.addUUID(from)
     --dns
     if data["dns_hostname"] then
