@@ -218,6 +218,7 @@ function mnp.networkConnectByName(from,name)
           return false
         else
           log("IP is set")
+          os.setenv("node_uuid",from)
           return true
         end
       else
