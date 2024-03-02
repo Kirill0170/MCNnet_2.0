@@ -6,6 +6,7 @@ local ser=require("serialization")
 local dns={}
 function dns.ver() return ver end
 function dns.checkHostname(name)
+  if not name then return false end
   local pattern = "^%w+%.%w+$"
   return string.match(name, pattern) ~= nil
 end
