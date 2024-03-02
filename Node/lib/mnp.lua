@@ -222,13 +222,18 @@ function mnp.networkSearch(from,si) --allows finding
   modem.send(from, ports["mnp_reg"],"netsearch",ser.serialize(rsi),ser.serialize({mnp.networkName}))
 end
 function mnp.networkConnect(from,si,data)
-  if not ip.isUUID(from) or not session.checkSession(si) then log("Invalid si or no from address") end
+  log("netConnect")
+  if not ip.isUUID(from) or not session.checkSession(si) then log("Invalid si or no from address") return false end
   if data then
-    if ser.unserialize(data)[1]~=mnp.networkName then return false end
+    if ser.unserialize(data)[1]~=mnp.networkName then
+      log("Invalid netname")
+      return false end
   end
   if si["route"][0]=="0000:0000" then --client
+    log("client!")
     local rsi=ser.serialize(session.newSession(os.getenv("this_ip")))
     local ipstr=string.sub(os.getenv("this_ip"),1,4)..":"..string.sub(from,1,4)
+    log("client with "..ipstr)
     modem.send(from,ports["mnp_reg"],"netconnect",rsi,ser.serialize({ipstr}))
     ip.addUUID(from)
     --dns
@@ -247,6 +252,7 @@ function mnp.networkConnect(from,si,data)
     ip.addUUID(from,true)
     return true
   else
+    log("unknown ip?")
     return false
   end
 end
