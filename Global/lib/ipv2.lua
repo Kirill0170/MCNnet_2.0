@@ -91,8 +91,8 @@ function ip.addUUID(g_uuid,node)
   return true
 end
 
-function ip.deleteUUID(g_uuid)
-  nips[g_uuid]=nil return true
+function ip.deleteIP(g_ip)
+  nips[g_ip]=nil return true
 end
 
 function ip.getNodes(except)
