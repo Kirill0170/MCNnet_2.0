@@ -68,8 +68,6 @@ end
 local function search(s,p)
   if p==true then mnp.toggleLog(true)
   elseif s==true then mnp.toggleLog(false) end
-  log("Opening ports..")
-  mnp.openPorts()
   log("Searching for networks...")
   os.setenv("this_ip","0000:0000")
   local rsi=mnp.networkSearch() --res[netname]={from,dist}
