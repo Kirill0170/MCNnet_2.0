@@ -6,6 +6,7 @@ function mncp()
 end
 
 function start()
+  mnp.openPorts(true)
   thread.create(mncp):detach()
 end
 
