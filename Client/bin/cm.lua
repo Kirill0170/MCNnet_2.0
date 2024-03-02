@@ -1,5 +1,5 @@
 --MNP CONNECTION MANAGER for client
-local ver="INDEV 0.1"
+local ver="INDEV 0.2"
 local mnp=require("cmnp")
 local term=require("term")
 local shell=require("shell")
