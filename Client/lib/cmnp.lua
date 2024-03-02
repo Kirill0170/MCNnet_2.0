@@ -135,6 +135,11 @@ end
 function mnp.saveDomain(domain,ip)
   sp[domain]=ip
 end
+local function checkHostname(name) --imported from dns.lua
+  if not name then return false end
+  local pattern = "^%w+%.%w+$"
+  return string.match(name, pattern) ~= nil
+end
 --Main-
 --------TO BE DELETED-------------------------------------------------
 function mnp.register(a,t)--what a shame
@@ -197,10 +202,13 @@ function mnp.networkSearch(searchTime) --idea: use a table to filter out used ad
   return res
 end
 
-function mnp.networkConnectByName(from,name)
+function mnp.networkConnectByName(from,name,domain)
   if not name then return false end
+  if domain and not checkHostname(domain) then log("Incorrect hostname!") return false end
   local rsi=ser.serialize(session.newSession(os.getenv("this_ip")))
-  modem.send(from,ports["mnp_reg"],"netconnect",rsi,ser.serialize({name}))
+  local sdata={name}
+  if domain then sdata={name,domain} end
+  modem.send(from,ports["mnp_reg"],"netconnect",rsi,ser.serialize(sdata))
   while true do
     local _,this,rfrom,port,_,mtype,si,data=event.pull(5,"modem")
     if not rfrom then
