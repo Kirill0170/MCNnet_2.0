@@ -207,7 +207,7 @@ function mnp.networkConnectByName(from,name,domain)
   if domain and not checkHostname(domain) then log("Incorrect hostname!") return false end
   local rsi=ser.serialize(session.newSession(os.getenv("this_ip")))
   local sdata={name}
-  if domain then sdata={name,domain} end
+  if domain then sdata["dns_hostname"]=domain sdata["dns_protocol"]="ssap" end --hardcoded ssap!
   modem.send(from,ports["mnp_reg"],"netconnect",rsi,ser.serialize(sdata))
   while true do
     local _,this,rfrom,port,_,mtype,si,data=event.pull(5,"modem")
