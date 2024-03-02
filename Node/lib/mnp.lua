@@ -38,7 +38,7 @@ print("[MNP INIT]: IP version "..ip.ver())
 print("[MNP INIT]: DNS version "..dns.ver())
 print("[MNP INIT]: Done")
 --MNCP-----------------------------------
-function mnp.mncpService()
+function mnp.mncpService()--rewrite with timer
   local a=2 --attempts
   local t=2 --timeout
   if not modem.isOpen(ports["mncp_srvc"]) then modem.open(ports["mncp_srvc"]) end
@@ -54,7 +54,7 @@ function mnp.mncpService()
         local times=computer.uptime()
         modem.send(n_uuid,ports["mncp_srvc"],"mncp_check",ser.serialize(session.newSession(os.getenv("this_ip"),n_ip,1)))
         local _,_,from,port,_,mtype,si=event.pull(t,"modem")
-        if from~=n_ip or port~=ports["mncp_srvc"] then
+        if from~=n_uuid or port~=ports["mncp_srvc"] then
           --ok
         elseif mtype=="mncp_srvc" then
           log("[MNCP]verified, ping: "..computer.uptime()-times)
@@ -63,7 +63,7 @@ function mnp.mncpService()
         end
         if not chk then --disconnect
           log("[MNCP]not verified connection! Disconnecting...")
-          ip.deleteUUID(n_uuid)
+          ip.deleteIP(n_ip)
         end
       end
     end

@@ -11,7 +11,7 @@ local thread=require("thread")
 local event=require("event")
 local ip=require("ipv2")
 local gpu=component.gpu
-local mnp_ver="2.2 EXPERIMENTAL"
+local mnp_ver="2.21 EXPERIMENTAL"
 local mncp_ver="2.0 EXPERIMENTAL"
 local sp={} --stores patterns of sessions to some IP| "IP"=session
 local forbidden_vers={}
@@ -44,7 +44,7 @@ function mnp.mncpCliService()
     local _,_,from,port,_,mtype,si=event.pull("modem")
     if port==ports["mncp_srvc"] and mtype=="mncp_check" then
       local to_ip=ser.unserialize(si)["route"][0]
-      modem.send(from,ports["mncp_srvc"],"mncp_check",ser.serialize(session.newSession(to_ip,2)))
+      modem.send(from,ports["mncp_srvc"],"mncp_check",ser.serialize(session.newSession(os.getenv("this_ip"),to_ip,2)))
     end
   end
 end
@@ -183,11 +183,13 @@ function mnp.networkSearch(searchTime) --idea: use a table to filter out used ad
     if id=="interrupted" then break
     elseif id=="timeout" and name==timerName then break
     else
-      if not session.checkSession(ser.unserialize(si)) then log("Invalid session on netsearch")
-      else
-        data=ser.unserialize(data)
-        if data[1]~=nil then
-          res[data[1]]={from,dist} --res[netname]={from,dist}
+      if port==ports["mnp_reg"] then
+        if not session.checkSession(ser.unserialize(si)) then log("Invalid session on netsearch")
+        else
+          data=ser.unserialize(data)
+          if data[1]~=nil then
+            res[data[1]]={from,dist} --res[netname]={from,dist}
+          end
         end
       end
     end
