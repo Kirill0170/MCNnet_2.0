@@ -18,8 +18,8 @@ local function help()
   print("Version "..ver)
   cprint("Usage: cm [options] <action> ",0x6699FF)
   print("search - search for networks")
-  print("connect <attempts> <timeout> - Connect to network")
-  print("status         Current network")
+  print("status - current connection status")
+  print("disconnect - disconnect from network ")
   cprint("Options:",0x33CC33)
   print("-s             Silence logs")
   print("-p             Print logs")
@@ -52,11 +52,6 @@ local function status()
   end
 end
 
-local function connect(a,t,s,p)
-  if p==true then mnp.toggleLog(true)
-  elseif s==true then mnp.toggleLog(false) end
-  mnp.register(a,t,dolog)
-end
 
 local function printDist(str1,str2)
   local color=0xFFFFFF
@@ -88,7 +83,6 @@ local function search(s,p)
       choice[counter]={rsi[name],name}
       counter=counter+1
     end
-    log(require("serialization").serialize(choice))
     print("------------------------------")
     print("Select network to connect or 'q' to exit")
     local exit=false
@@ -112,12 +106,15 @@ local function search(s,p)
     mnp.networkConnectByName(choice[selected][1][1],choice[selected][2])
   end
 end
+
+local function disconnect()
+  mnp.disconnect()
+end
 --main
 local args,ops = shell.parse(...)
 if not args and not ops then help()
 elseif ops["h"] or ops["help"] then help()
-elseif args[1]=="connect" then
-  connect(args[2],args[3],ops["s"],ops["p"])
+elseif args[1]=="disconnect" then disconnect()
 elseif args[1]=="status" then status()
 elseif args[1]=="search" then search(ops["s"],ops["p"])
 else help() end 

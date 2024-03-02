@@ -209,11 +209,16 @@ function mnp.networkConnectByName(from,name)
       data=ser.unserialize(data)
       if name==data[1] then
         log("Connected to "..name)
-        if not ip.set(string.sub(from,1,4)..":"..string.sub(this,1,4)) then
+        if not ip.isIPv2(data[2]) then 
+          log("incorrect IP received: aborted")
+          return false
+        end
+        if not ip.set(data[2]) then
           log("Couldn't set IP, please debug!")
           return false
         else
           log("IP is set")
+          os.setenv("node_uuid",from)
           return true
         end
       else
@@ -222,6 +227,10 @@ function mnp.networkConnectByName(from,name)
       end
     end
   end
+end
+
+function mnp.disconnect()
+   modem.send(os.getenv("node_uuid"),ports["mnp_reg"],"netdisconnect",ser.serialize(session.newSession()))
 end
 
 function mnp.search(to_ip,searchTime)--check si

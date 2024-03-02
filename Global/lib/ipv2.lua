@@ -1,23 +1,17 @@
 --MCnet IPv2 handling
 --Modem is required.
-local MODE="NODE" --CLIENT or NODE or SERVER or TNODE
+
 --init----------------------
 local component=require("component")
 if not component.isAvailable("modem") then error("[IP INIT]: No modem present") end
 local this_uuid=component.getPrimary("modem")["address"]
 local this_ip=os.getenv("this_ip")
-local ip_ver="2.0 EXPERIMENTAL"
+local ip_ver="2.0 BETA"
 print("[IP INIT]: Done")
 local nips={} --nips[<ip>]=<uuid>
 local ip={}
 ----------------------------
 function ip.ver() return ip_ver end
-function ip.setMode(g_mode)
-  if g_mode=="NODE" or g_mode=="CLIENT" or g_mode=="SERVER" or g_mode=="TNODE" then
-    MODE=g_mode
-    return true
-  else return false end
-end
 
 function ip.isIPv2(g_ip,nodechk)--nodechk for checking if node
   if not g_ip then return false end
@@ -42,13 +36,13 @@ function ip.gnip()
   return string.sub(this_uuid,1,4)..":0000"
 end
 
-function ip.set(g_ip)
-  if MODE=="NODE" or MODE=="TNODE" then
+function ip.set(g_ip,node)
+  if node then
     if ip.isIPv2(g_ip,true) then
       os.setenv("this_ip",g_ip)
       return true
     else return false end
-  elseif MODE=="CLIENT" or MODE=="SERVER" then
+  else
     if ip.isIPv2(g_ip) then
       os.setenv("this_ip",g_ip)
       return true
