@@ -12,7 +12,7 @@ local event=require("event")
 local ip=require("ipv2")
 local gpu=component.gpu
 local mnp_ver="2.21 EXPERIMENTAL"
-local mncp_ver="2.0 EXPERIMENTAL"
+local mncp_ver="2.1 EXPERIMENTAL"
 local sp={} --stores patterns of sessions to some IP| "IP"=session
 local forbidden_vers={}
 local ports={}
@@ -36,8 +36,12 @@ if dolog then
   print("[MNP INIT]: IP version "..ip.ver())
   print("[MNP INIT]: Done")
 end
+local function timer(time,name)
+  os.sleep(time)
+  computer.pushSignal("timeout",name)
+end
 --MNCP-----------------------------------
-function mnp.mncpCliService()
+function mnp.mncp.CliService()
   if not modem.isOpen(ports["mncp_srvc"]) then modem.open(ports["mncp_srvc"]) end
   log("Started MNCP service")
   while true do
@@ -47,6 +51,28 @@ function mnp.mncpCliService()
       modem.send(from,ports["mncp_srvc"],"mncp_check",ser.serialize(session.newSession(os.getenv("this_ip"),to_ip,2)))
     end
   end
+end
+function mnp.mncp.nodePing()
+  if not ip.isUUID(os.getenv("node_uuid")) or not ip.isIPv2(os.getenv("this_ip")) then
+    return nil
+  end
+  modem.send(os.getenv("node_uuid"),ports["mncp_ping"],"mncp_ping",ser.serialize(session.newSession()))
+  local start_time=computer.uptime()
+  local end_time=0
+  local timeout=false
+  thread.create(timer,"ping"..start_time):detach()
+  while not timeout do
+    local id,name,from,port,_,mtype,si=event.pullMultiple("timeout","modem","interrupted")
+    if id=="interrupted" then timeout=true
+    elseif id=="timeout" and name=="ping"..start_time then timeout=true
+    elseif from==os.getenv("node_uuid") and port==ports["mncp_ping"] and mtype=="mncp_ping" then
+      end_time=computer.uptime()
+      break
+    end
+  end
+  if timeout then return nil
+  elseif end_time~=0 then return tonumber(end_time)-tonumber(start_time)
+  else return nil end --fail??
 end
 --DNS------------------------------------
 function mnp.dnsService() --SERVER USAGE ONLY(DEPRECATED)
@@ -82,10 +108,6 @@ function log(text,crit)
     file:close()
     error("Fatal error occured in runtime,see log file")
   else end
-end
-function timer(time,name)
-  os.sleep(time)
-  computer.pushSignal("timeout",name)
 end
 function mnp.crash(reason) --do not use
   modem.open(ports["mncp_err"])
