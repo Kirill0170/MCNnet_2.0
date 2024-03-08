@@ -38,7 +38,7 @@ print("[MNP INIT]: IP version "..ip.ver())
 print("[MNP INIT]: DNS version "..dns.ver())
 print("[MNP INIT]: Done")
 --MNCP-----------------------------------
-function mnp.mncpService()--rewrite with timer
+function mnp.mncp.checkService()--rewrite with timer
   local a=2 --attempts
   local t=2 --timeout
   if not modem.isOpen(ports["mncp_srvc"]) then modem.open(ports["mncp_srvc"]) end
@@ -68,6 +68,9 @@ function mnp.mncpService()--rewrite with timer
       end
     end
   until err
+end
+function mnp.mncp.nodePing(from)
+  modem.send(from,ports["mncp_ping"],"mncp_ping",ser.serialize(session.newSession()))
 end
 --MNP------------------------------------
 --Util-

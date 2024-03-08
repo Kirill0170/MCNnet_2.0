@@ -78,7 +78,7 @@ log("Connecting to other nodes with "..netname.." name...")
 log("Should take "..searchTime.." seconds, as described in node.lua")
 if not mnp.nodeConnect(searchTime) then log("Could not set connect to other nodes: check if ip is set?",3) end
 log("Starting MNCP")
---thread.create(mnp.mncpService):detach() --uncomment this line when in prod!
+--thread.create(mnp.mncp.checkService):detach() --uncomment this line when in prod!
 --main
 log("Node Online!")
 
