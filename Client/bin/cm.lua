@@ -122,4 +122,5 @@ elseif ops["h"] or ops["help"] then help()
 elseif args[1]=="disconnect" then disconnect()
 elseif args[1]=="status" then status()
 elseif args[1]=="search" then search(ops["s"],ops["p"])
+elseif args[1]=="nping" then pingNode()
 else help() end 
