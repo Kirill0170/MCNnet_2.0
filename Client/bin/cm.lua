@@ -20,6 +20,7 @@ local function help()
   print("search - search for networks")
   print("status - current connection status")
   print("disconnect - disconnect from network ")
+  print("nping - ping node")
   cprint("Options:",0x33CC33)
   print("-s             Silence logs")
   print("-p             Print logs")
@@ -107,6 +108,12 @@ end
 
 local function disconnect()
   mnp.disconnect()
+end
+
+local function pingNode()
+  local time=mnp.mncp.nodePing()
+  if not time then print("Failed to ping your node.")
+  else print("Ping: "..time) end
 end
 --main
 local args,ops = shell.parse(...)
