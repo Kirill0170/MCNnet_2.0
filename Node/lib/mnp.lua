@@ -29,7 +29,7 @@ ports["mftp_srvc"]=1008
 ports["dns_lookup"]=1009
 local mnp={}
 local mnp.mncp={} --mncp
-mnp.networkName="default" --default network name
+mnp.networkName="default" --default network name(THIS IS NOT WORKING LOOOL)
 --init-----------------------------------
 print("[MNP INIT]: Starting...")
 print("[MNP INIT]: MNP version "..mnp_ver)
