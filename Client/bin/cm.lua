@@ -111,7 +111,7 @@ local function disconnect()
 end
 
 local function pingNode()
-  local time=mnp.mncp.nodePing()
+  local time=mnp.mncp_nodePing()
   if not time then print("Failed to ping your node.")
   else print("Ping: "..time) end
 end
