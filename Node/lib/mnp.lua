@@ -28,7 +28,6 @@ ports["mftp_data"]=1007
 ports["mftp_srvc"]=1008
 ports["dns_lookup"]=1009
 local mnp={}
-local mnp.mncp={} --mncp(THIS IS NOT WORKING LOL)
 mnp.networkName="default" --default network name
 --init-----------------------------------
 print("[MNP INIT]: Starting...")
@@ -39,7 +38,7 @@ print("[MNP INIT]: IP version "..ip.ver())
 print("[MNP INIT]: DNS version "..dns.ver())
 print("[MNP INIT]: Done")
 --MNCP-----------------------------------
-function mnp.mncp.checkService()--rewrite with timer
+function mnp.mncp_checkService()--rewrite with timer
   local a=2 --attempts
   local t=2 --timeout
   if not modem.isOpen(ports["mncp_srvc"]) then modem.open(ports["mncp_srvc"]) end
@@ -70,7 +69,7 @@ function mnp.mncp.checkService()--rewrite with timer
     end
   until err
 end
-function mnp.mncp.nodePing(from)
+function mnp.mncp_nodePing(from)
   modem.send(from,ports["mncp_ping"],"mncp_ping",ser.serialize(session.newSession()))
 end
 --MNP------------------------------------
