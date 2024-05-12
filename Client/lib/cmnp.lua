@@ -202,7 +202,7 @@ function mnp.networkSearch(searchTime) --idea: use a table to filter out used ad
   if not searchTime then searchTime=10 end
   local res={}
   local timerName="ns"..computer.uptime()
-  if not modem.isOpen(ports["mnp_reg"]) then mode.open(ports["mnp_reg"]) end
+  if not modem.isOpen(ports["mnp_reg"]) then modem.open(ports["mnp_reg"]) end
   thread.create(timer,searchTime,timerName):detach()
   while true do
     modem.broadcast(ports["mnp_reg"],"netsearch",ser.serialize(session.newSession()))
