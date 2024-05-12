@@ -41,7 +41,7 @@ local function timer(time,name)
   computer.pushSignal("timeout",name)
 end
 --MNCP-----------------------------------
-function mnp.mncp.CliService()
+function mnp.mncp_CliService()
   if not modem.isOpen(ports["mncp_srvc"]) then modem.open(ports["mncp_srvc"]) end
   log("Started MNCP service")
   while true do
@@ -52,7 +52,7 @@ function mnp.mncp.CliService()
     end
   end
 end
-function mnp.mncp.nodePing()
+function mnp.mncp_nodePing()
   if not ip.isUUID(os.getenv("node_uuid")) or not ip.isIPv2(os.getenv("this_ip")) then
     return nil
   end
