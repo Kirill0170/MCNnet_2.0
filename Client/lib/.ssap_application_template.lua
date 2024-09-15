@@ -20,13 +20,15 @@ styles["example"]["fg_color"]="0xFFFFEE"
 
 local function application() --EDIT HERE
   if config["log"] then print("Application started") end
+  api.text("SSAP APP TEMPLATE") --text
+  api.text("Hello world!",styles["example"]) -- styled text: use styles
+  api.text("test",{},{2,2}) --positioned text: {x,y}
   while true do --main loop(You don't want your application to finish, right?)
-    api.text("SSAP APP TEMPLATE") --text
-    api.text("Hello world!",styles["example"]) -- styled text: use styles
-    api.text("test",{},{2,2}) --positioned text: {x,y}
     local str=api.input(60,"[Enter string]>:")
     api.text(str)
-    api.exit()--or os.exit()
+    if str=="q" or str=="exit" then
+      api.exit()--or os.exit()
+    end
   end
 end
 

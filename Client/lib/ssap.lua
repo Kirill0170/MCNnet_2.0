@@ -1,5 +1,4 @@
 local version="1.1 indev"
-local filename="app.lua"
 local dolog=true
 local component=require("component")
 local computer=require("computer")
@@ -43,7 +42,15 @@ end
 function ssap.getVersion() return version end
 --Main--
 function ssap.clientConnect(to_ip,timeoutTime)
-  if not to_ip or not ip.isIPv2(to_ip) or not cmnp.getPattern(to_ip) then return false end
+  if not to_ip or not ip.isIPv2(to_ip) then return false end
+  if not mnp.isConnected() then return false end
+  if not cmnp.getPattern(to_ip) then
+    log(to_ip.."pattern not found, searching")
+    if not cmnp.search(to_ip) then
+      print("Couldn't find specified IP.")
+      return false
+    end
+  end
   if not timeoutTime then timeoutTime=10 end --ssap connection should be fast
   local data={}
   data[1]="init"
@@ -69,10 +76,16 @@ function ssap.clientConnect(to_ip,timeoutTime)
   end
   log("Could not connect to server",1)
 end
-function ssap.serverConnectionManager() --no UAP support
+function ssap.serverConnectionManager(filename) --no UAP support
+  local fs=require("filesystem")
+  if not fs.exists(filename) then
+    log("Couldn't start SSAP CM: no such file: "..filename,2)
+    return false
+  end
+  if not mnp.isConnected() then log("Couldn't start SSAP CM: not connected",2) return false end
   log("Started SSAP Connection Manager")
   while true do
-    local id,_,from,port,_,mtype,si,data=event.pullMultiple("modem","interrupted","ssap_stopCM")
+    local id,_,from,port,_,mtype,si,data=event.pullMultiple("modem_message","interrupted","ssap_stopCM")
     if id=="interrupted" then
       log("CM interrupted",2)
       break 
@@ -162,7 +175,7 @@ function ssap.clientConnection(server_ip,timeoutTime)--0: disconnected 1: server
       local sdata={"input_response",{},{input}}
       cmnp.send(server_ip,"ssap",sdata)
     else
-      log("Unknown ssap header: "..tostring(rdata[1]),1S)
+      log("Unknown ssap header: "..tostring(rdata[1]),1)
     end
   end
 end

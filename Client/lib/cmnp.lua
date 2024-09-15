@@ -98,7 +98,7 @@ function log(text,crit)
   if dolog and crit==0 or not crit then
     print(res.."[MNP/INFO]"..text)
   elseif dolog and crit==1 then
-    gpu.setForeground(0xFFFF33)
+    gpu.setForeground(0xFFCC33)
     print(res.."[MNP/WARN]"..text)
     gpu.setForeground(0xFFFFFF)
   elseif crit==2 then
@@ -273,7 +273,19 @@ function mnp.disconnect()
    ip.remove()
 end
 
+function mnp.isConnected(ping)
+  if ip.isUUID(os.getenv("node_uuid")) and ip.isIPv2(os.getenv("this_ip")) then
+    if ping then
+      if not mnp.mncp_nodePing(1) then return false end
+      return true
+    end
+    return true
+  end
+  return false
+end
+
 function mnp.search(to_ip,searchTime)--check si
+  if not mnp.isConnected() then return false end
   if not to_ip then return false end
   if not searchTime then searchTime=300 end
   local timerName="ms"..computer.uptime() --feel free to change first string
@@ -306,6 +318,7 @@ function mnp.search(to_ip,searchTime)--check si
   return false
 end
 function mnp.dnslookup(hostname,searchTime) --fix: check si
+  if not mnp.isConnected() then return false end
   if not hostname then return false end
   if not searchTime then searchTime=300 end
   local timerName="mdl"..computer.uptime()
@@ -372,6 +385,7 @@ function mnp.connect(sessionTemplate,attempts,timeout) --client (rewrite with ti
   return false
 end
 function mnp.server_connection(si,data,connectedList) --server
+  if not mnp.isConnected() then return false end
   if not session.checkSession(si) or not data then return false end
   data=ser.unserialize(data)
   --banned uuids here
@@ -384,6 +398,7 @@ function mnp.server_connection(si,data,connectedList) --server
   modem.send(si["route"][#si["route"]-1],"connection",ser.serialize(si),ser.serialize(data))
 end
 function mnp.send(to_ip,mtype,data)
+  if not mnp.isConnected() then return false end
   if not mtype then mtype="data" end
   if not data then data={} end
   local si=mnp.getPattern(to_ip)
@@ -393,12 +408,14 @@ function mnp.send(to_ip,mtype,data)
   modem.send(to_uuid,ports["mnp_data"],mtype,ser.serialize(si),ser.serialize(data))
 end
 function mnp.sendBack(mtype,si,data)
+  if not mnp.isConnected() then return false end
   if not session.checkSession(si) then return false end
   si["r"]=true
   if not data then data={} end
   modem.send(si["route"][#si["route"]-1],ports["mnp_data"],mtype,ser.serialize(si),ser.serialize(data))
 end
 function mnp.receive(from_ip,mtype,timeoutTime)
+  if not mnp.isConnected() then return nil end
   local timerName="r"..computer.uptime()
   thread.create(timer,timeoutTime,timerName)
   while true do
