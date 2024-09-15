@@ -263,6 +263,8 @@ end
 
 function mnp.disconnect()
    modem.send(os.getenv("node_uuid"),ports["mnp_reg"],"netdisconnect",ser.serialize(session.newSession()))
+   os.setenv("node_uuid",nil)
+   ip.remove()
 end
 
 function mnp.search(to_ip,searchTime)--check si

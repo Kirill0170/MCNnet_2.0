@@ -49,6 +49,9 @@ function ip.set(g_ip,node)
     else return false end
   end
 end
+function ip.remove()
+  os.setenv("this_ip",nil)
+end
 
 function ip.getParts(g_ip)
   if not ip.isIPv2(g_ip) then return nil end
