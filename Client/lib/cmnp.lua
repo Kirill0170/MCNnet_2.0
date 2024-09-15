@@ -52,22 +52,28 @@ function mnp.mncp_CliService()
     end
   end
 end
-function mnp.mncp_nodePing()
+function mnp.mncp_nodePing(timeoutTime)
+  if not modem.isOpen(ports["mncp_ping"]) then modem.open(ports["mncp_ping"]) end
   if not ip.isUUID(os.getenv("node_uuid")) or not ip.isIPv2(os.getenv("this_ip")) then
     return nil
   end
-  modem.send(os.getenv("node_uuid"),ports["mncp_ping"],"mncp_ping",ser.serialize(session.newSession()))
+  if not timeoutTime then timeoutTime=10 end
   local start_time=computer.uptime()
   local end_time=0
   local timeout=false
-  thread.create(timer,"ping"..start_time):detach()
+  thread.create(timer,timeoutTime,"ping"..start_time):detach()
   while not timeout do
-    local id,name,from,port,_,mtype,si=event.pullMultiple("timeout","modem","interrupted")
+    modem.send(os.getenv("node_uuid"),ports["mncp_ping"],"mncp_ping",ser.serialize(session.newSession()))
+    local id,name,from,port,_,mtype,si=event.pullMultiple("timeout","modem_message","interrupted")
     if id=="interrupted" then timeout=true
     elseif id=="timeout" and name=="ping"..start_time then timeout=true
-    elseif from==os.getenv("node_uuid") and port==ports["mncp_ping"] and mtype=="mncp_ping" then
-      end_time=computer.uptime()
-      break
+    elseif id=="modem_message" then
+      if from==os.getenv("node_uuid") and port==ports["mncp_ping"] and mtype=="mncp_ping" then
+        end_time=computer.uptime()
+        break
+      else
+        print("[debug]some other modem answered?")
+      end
     end
   end
   if timeout then return nil

@@ -55,6 +55,8 @@ local function connection(from,port,mtype,si,data)
     mnp.search(from,si)
   elseif mtype=="dns_lookup" then
     mnp.dnsLookup(from,si,data)
+  elseif mtype=="mncp_ping" then
+    mnp.mncp_nodePing(from)
   else --data
     mnp.pass(port,mtype,si,data)
   end

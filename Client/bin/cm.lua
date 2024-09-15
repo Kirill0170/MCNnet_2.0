@@ -1,5 +1,5 @@
 --MNP CONNECTION MANAGER for client
-local ver="INDEV 0.2"
+local ver="INDEV 0.5"
 local mnp=require("cmnp")
 local term=require("term")
 local shell=require("shell")
@@ -16,14 +16,17 @@ end
 local function help()
   cprint("MNP Client Connection Manager",0xFFCC33)
   print("Version "..ver)
-  cprint("Usage: cm [options] <action> ",0x6699FF)
-  print("search - search for networks")
-  print("status - current connection status")
-  print("disconnect - disconnect from network ")
-  print("nping - ping node")
+  cprint("Usage: cm [action] <options>",0x6699FF)
+  cprint("Actions:",0x33CC33)
+  print("search         search for networks")
+  print("status         current connection status")
+  print("disconnect     disconnect from network ")
+  print("nping <n> <t>  ping node")
   cprint("Options:",0x33CC33)
   print("-s             Silence logs")
   print("-p             Print logs")
+  print("--t=<int>      Timeout time(for ping)")
+  print("--n=<int>      Number of iterations(for ping & search)")
 end
 
 local function status()
@@ -110,10 +113,48 @@ local function disconnect()
   mnp.disconnect()
 end
 
-local function pingNode()
-  local time=mnp.mncp_nodePing()
-  if not time then print("Failed to ping your node.")
-  else print("Ping: "..time) end
+local function calculateStats(array)
+  local max = array[1]
+  local min = array[1]
+  local sum = 0
+  for _, value in ipairs(array) do
+      if value>max then max=value end
+      if value < min then min = value end
+      sum=sum+value
+  end
+  local average = sum / #array
+  return max, min, average
+end
+local function roundTime(value)
+  return math.floor(value*100+0.5)/100
+end
+local function pingNode(n,t)
+  if n then
+    if not tonumber(n) then print("--n should be given a number, defaulting to 1.") end
+  else
+    n=1
+  end
+  if t then
+    if not tonumber(t) then print("--t should be given a number, defaulting to 10") t=10 end
+  else
+    t=10
+  end
+  print("Pinging node "..string.sub(os.getenv("node_uuid"),1,4)..":0000")
+  if n==1 then
+    local time=mnp.mncp_nodePing(tonumber(t))
+    if not time then print("Ping timeout.")
+    else print("Ping: "..time.."s") end
+  else
+    times={}
+    for i=1,n do
+      local time=mnp.mncp_nodePing(tonumber(t))
+      if not time then print(i..")Ping timeout.") times[i]=0
+      else time=roundTime(time) print(i..")Ping: "..time.."s") times[i]=time end
+    end
+    max,min,avg=calculateStats(times)
+    print("Ping statistics:")
+    print("     max: "..max.."s min: "..min.."s avg: "..avg.."s")
+  end
 end
 --main
 local args,ops = shell.parse(...)
@@ -122,5 +163,5 @@ elseif ops["h"] or ops["help"] then help()
 elseif args[1]=="disconnect" then disconnect()
 elseif args[1]=="status" then status()
 elseif args[1]=="search" then search(ops["s"],ops["p"])
-elseif args[1]=="nping" then pingNode()
+elseif args[1]=="nping" then pingNode(ops["n"],ops["t"])
 else help() end 
