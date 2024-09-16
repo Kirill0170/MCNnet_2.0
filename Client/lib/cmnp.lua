@@ -1,7 +1,7 @@
 --Mcn-net Networking Protocol for Client v2.1 EXPERIMENTAL
 --Modem is required.
 local dolog=false --log
-local saveFileName="SavedSessionTemplates" --change if you want 
+local saveFileName=".savedSessionTemplates" --change if you want 
 local component=require("component")
 local computer=require("computer")
 local ser=require("serialization")
@@ -35,6 +35,13 @@ if dolog then
   print("[MNP INIT]: SP version "..session.ver())
   print("[MNP INIT]: IP version "..ip.ver())
   print("[MNP INIT]: Done")
+end
+--check file
+cfile=io.open(saveFileName..".sst","r")
+if not cfile then
+  cfile=io.open(saveFileName..".sst","w")
+  cfile:write("")
+  cfile:close()
 end
 local function timer(time,name)
   os.sleep(time)
@@ -137,7 +144,8 @@ function mnp.setSaveFileName(newName) saveFileName=newName end
 function mnp.loadSavedPatterns()
   local file=io.open(saveFileName..".sst","r")
   savedata=ser.unserialize(file:read("*a"))
-  sp=savedata
+  if savedata=="" or savedata==nil then sp={}
+  else sp=savedata end
   file:close()
 end
 function mnp.saveSavedPatterns()
@@ -163,7 +171,7 @@ end
 function mnp.saveDomain(domain,ip)
   sp[domain]=ip
 end
-local function checkHostname(name) --imported from dns.lua
+function mnp.checkHostname(name) --imported from dns.lua
   if not name then return false end
   local pattern = "^%w+%.%w+$"
   return string.match(name, pattern) ~= nil
@@ -232,7 +240,7 @@ end
 
 function mnp.networkConnectByName(from,name,domain)
   if not name then return false end
-  if domain and not checkHostname(domain) then log("Incorrect hostname!") return false end
+  if domain and not mnp.checkHostname(domain) then log("Incorrect hostname!") return false end
   local rsi=ser.serialize(session.newSession(os.getenv("this_ip")))
   local sdata={name}
   if domain then sdata["dns_hostname"]=domain sdata["dns_protocol"]="ssap" end --hardcoded ssap!
@@ -354,8 +362,10 @@ function mnp.dnslookup(hostname,searchTime) --fix: check si
   log("DNS Lookup failed: timeout", 1)
   return false
 end
-function mnp.connect(sessionTemplate,attempts,timeout) --client (rewrite with timeout?)
-  if not session.checkSession(sessionTemplate) or not sessionTemplate["f"] then return false end
+function mnp.connect(to_ip,attempts,timeout) --client (rewrite with timeout?)
+  if not ip.isIPv2(to_ip) then return false end
+  local sessionInfo=mnp.getPattern(to_ip)
+  if not sessionInfo then return false end
   if not tonumber(attempts) then attempts=2 end
   if not tonumber(timeout) then timeout=5 end
   for att=1,attempts do
@@ -384,7 +394,16 @@ function mnp.connect(sessionTemplate,attempts,timeout) --client (rewrite with ti
   log("Cannot connect",1)
   return false
 end
-function mnp.server_connection(si,data,connectedList) --server
+function mnp.isConnectedToServer(to_ip)
+  if os.getenv("conn_ip")==to_ip then return true end
+  --ping server
+  return false
+end
+function mnp.disconnectFromServer()
+  --send discon packet
+  os.setenv("conn_ip",nil)
+end
+function mnp.server_connection(si,data,connectedList) --for server
   if not mnp.isConnected() then return false end
   if not session.checkSession(si) or not data then return false end
   data=ser.unserialize(data)

@@ -43,14 +43,8 @@ function ssap.getVersion() return version end
 --Main--
 function ssap.clientConnect(to_ip,timeoutTime)
   if not to_ip or not ip.isIPv2(to_ip) then return false end
-  if not mnp.isConnected() then return false end
-  if not cmnp.getPattern(to_ip) then
-    log(to_ip.."pattern not found, searching")
-    if not cmnp.search(to_ip) then
-      print("Couldn't find specified IP.")
-      return false
-    end
-  end
+  if not cmnp.isConnected() then return false end
+  if not cmnp.isConnectedToServer(to_ip) then return false end
   if not timeoutTime then timeoutTime=10 end --ssap connection should be fast
   local data={}
   data[1]="init"
@@ -82,7 +76,7 @@ function ssap.serverConnectionManager(filename) --no UAP support
     log("Couldn't start SSAP CM: no such file: "..filename,2)
     return false
   end
-  if not mnp.isConnected() then log("Couldn't start SSAP CM: not connected",2) return false end
+  if not cmnp.isConnected() then log("Couldn't start SSAP CM: not connected",2) return false end
   log("Started SSAP Connection Manager")
   while true do
     local id,_,from,port,_,mtype,si,data=event.pullMultiple("modem_message","interrupted","ssap_stopCM")

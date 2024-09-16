@@ -1,5 +1,5 @@
 --MNP CONNECTION MANAGER for client
-local ver="INDEV 0.5"
+local ver="INDEV 0.51"
 local mnp=require("cmnp")
 local term=require("term")
 local shell=require("shell")
@@ -105,7 +105,7 @@ local function search(s,p)
     end
     --connect
     print("Trying to connect to "..choice[selected][2])
-    mnp.networkConnectByName(choice[selected][1][1],choice[selected][2])
+    mnp.networkConnectByName(choice[selected][1][1],choice[selected][2],1)
   end
 end
 
@@ -130,12 +130,14 @@ local function roundTime(value)
 end
 local function pingNode(n,t)
   if n then
-    if not tonumber(n) then print("--n should be given a number, defaulting to 1.") end
+    if not tonumber(n) then cprint("--n should be given a number, defaulting to 1.",0xFFCC33) n=1 end
+    n=tonumber(n)
   else
     n=1
   end
   if t then
-    if not tonumber(t) then print("--t should be given a number, defaulting to 10") t=10 end
+    if not tonumber(t) then cprint("--t should be given a number, defaulting to 10",0xFFCC33) t=10 end
+    t=tonumber(t)
   else
     t=10
   end
