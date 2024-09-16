@@ -41,7 +41,7 @@ function timer(time,name)
 end
 function ssap.getVersion() return version end
 --Main--
-function ssap.clientConnect(to_ip,timeoutTime)
+function ssap.clientConnect(to_ip,timeoutTime)--REDO AND FIX ISSUES
   if not to_ip or not ip.isIPv2(to_ip) then return false end
   if not cmnp.isConnected() then return false end
   if not cmnp.isConnectedToServer(to_ip) then return false end
@@ -119,7 +119,7 @@ end
 function ssap.send(to_ip,data)
   cmnp.send(to_ip,"ssap",data)
 end
-function ssap.getInput(from_ip,timeoutTime,label)
+function ssap.getInput(from_ip,timeoutTime,label)--REDO THIS USING DEDICATED INPUT
   if not ip.isIPv2(from_ip) then return nil end
   if not tonumber(timeoutTime) then timeoutTime=120 end
   sdata={"input_request",{},{}}
@@ -136,7 +136,8 @@ end
 function ssap.disconnect(to_ip)
   cmnp.send(to_ip,"ssap",{"exit",{},{}})
 end
-function ssap.clientConnection(server_ip,timeoutTime)--0: disconnected 1: server timeout 2: client timeout
+function ssap.clientConnection(server_ip,timeoutTime)--REDO THIS USING DEDICATED INPUT
+  --0: disconnected 1: server timeout 2: client timeout
   local gpu=require("component").gpu
   local term=require("term")
   if not tonumber(timeoutTime) then timeoutTime=60 end
