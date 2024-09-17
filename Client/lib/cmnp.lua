@@ -1,7 +1,7 @@
 --Mcn-net Networking Protocol for Client v2.1 EXPERIMENTAL
 --Modem is required.
 local dolog=false --log
-local saveFileName=".savedSessionTemplates" --change if you want 
+local saveFileName="/usr/.mnpSavedBuffer.sb"-- array[netname]=from
 local component=require("component")
 local computer=require("computer")
 local ser=require("serialization")
@@ -16,7 +16,6 @@ local mncp_ver="2.3 REWORK INDEV"
 local forbidden_vers={}
 forbidden_vers["mnp"]={"2.21 EXPERIMENTAL"}
 forbidden_vers["mncp"]={"2.1 EXPERIMENTAL"}
-local sp={} --stores patterns of sessions to some IP| "IP"=session
 local ports={}
 ports["mnp_reg"]=1000
 ports["mnp_srch"]=1001
@@ -37,13 +36,6 @@ if dolog then
   print("[MNP INIT]: SP version "..session.ver())
   print("[MNP INIT]: IP version "..ip.ver())
   print("[MNP INIT]: Done")
-end
---check file REVIEW
-cfile=io.open(saveFileName..".sst","r")
-if not cfile then
-  cfile=io.open(saveFileName..".sst","w")
-  cfile:write("")
-  cfile:close()
 end
 local function timer(time,name)
   os.sleep(time)
@@ -132,37 +124,33 @@ function mnp.toggleLog(change)
     return true
   else return false end
 end
---Saving Patterns- !!!REDO THIS SYSTEM!!!
+--Saving Node Addresses--
 function mnp.setSaveFileName(newName) saveFileName=newName end
-function mnp.loadSavedPatterns()
-  local file=io.open(saveFileName..".sst","r")
+function mnp.loadSavedNodes()
+  local file=io.open(saveFileName,"r")
+  if not file then --initialize file
+    file=io.open(saveFileName,"w")
+    file:write(ser.serialize({}))
+    file:close()
+    return {}
+  end
   savedata=ser.unserialize(file:read("*a"))
-  if savedata=="" or savedata==nil then sp={}
-  else sp=savedata end
   file:close()
+  if savedata=="" or savedata==nil then return {}
+  else return savedata end
 end
-function mnp.saveSavedPatterns()
-  local file=io.open(saveFileName..".sst", "w")
-  file:write(ser.serialize(sp))
+function mnp.saveNodes(table)
+  if type(table)~="table" then return false end
+  local file=io.open(saveFileName, "w")
+  file:write(ser.serialize(table))
   file:close()
+  return true
 end
-function mnp.getPattern(to_ip)
-  for ip,session in pairs(sp) do
-    if ip==to_ip then return ser.unserialize(session) end 
+function mnp.getSavedAddress(table,networkName)
+  for netname,from in pairs(table) do
+    if netname==networkName then return from end 
   end
   return nil
-end
-function mnp.getIp(domain)
-  for name,ip in pairs(sp) do
-    if name==domian then return ip end
-  end
-  return nil
-end
-function mnp.savePattern(to_ip,session)
-  sp[to_ip]=ser.serialize(session)
-end
-function mnp.saveDomain(domain,ip)
-  sp[domain]=ip
 end
 function mnp.checkHostname(name) --imported from dns.lua
   if not name then return false end
@@ -170,14 +158,18 @@ function mnp.checkHostname(name) --imported from dns.lua
   return string.match(name, pattern) ~= nil
 end
 --Main-
-function mnp.networkSearch(searchTime) --idea: use a table to filter out used addresses REWORK
+function mnp.networkSearch(searchTime,save)
   if not searchTime then searchTime=10 end
-  local res={}
+  local saveTable=nil
+  if save then
+    saveTable=mnp.loadSavedNodes()
+  end
+  local res={}--res[netname]={from,dist}
   local timerName="ns"..computer.uptime()
   if not modem.isOpen(ports["mnp_reg"]) then modem.open(ports["mnp_reg"]) end
   thread.create(timer,searchTime,timerName):detach()
   while true do
-    modem.broadcast(ports["mnp_reg"],"netsearch",ser.serialize(session.newSession()))
+    modem.broadcast(ports["mnp_reg"],"netsearch",ser.serialize(session.newSession()),ser.serialize({res}))
     local id,name,from,port,dist,mtype,si,data=event.pullMultiple("modem","timeout","interrupted")
     if id=="interrupted" then break
     elseif id=="timeout" and name==timerName then break
@@ -186,22 +178,22 @@ function mnp.networkSearch(searchTime) --idea: use a table to filter out used ad
         if not session.checkSession(ser.unserialize(si)) then log("Invalid session on netsearch")
         else
           data=ser.unserialize(data)
-          if data[1]~=nil then
-            res[data[1]]={from,dist} --res[netname]={from,dist}
+          if data[1]~=nil then --netname found
+            res[data[1]]={from,dist}
+            if save then saveTable[data[1]]=from end
           end
         end
       end
     end
   end
+  if save then mnp.saveNodes(saveTable) end
   return res
 end
 
-function mnp.networkConnectByName(from,name,domain) --REDO
+function mnp.networkConnectByName(from,name)
   if not name then return false end
-  if domain and not mnp.checkHostname(domain) then log("Incorrect hostname!") return false end
   local rsi=ser.serialize(session.newSession(os.getenv("this_ip")))
   local sdata={name}
-  if domain then sdata["dns_hostname"]=domain sdata["dns_protocol"]="ssap" end --hardcoded ssap!
   modem.send(from,ports["mnp_reg"],"netconnect",rsi,ser.serialize(sdata))
   while true do
     local _,this,rfrom,port,_,mtype,si,data=event.pull(5,"modem")

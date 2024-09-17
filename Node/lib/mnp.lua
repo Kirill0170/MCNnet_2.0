@@ -103,40 +103,39 @@ end
 function mnp.networkDisconnect(from)--!review!
   ip.deleteUUID(from)
 end
-function mnp.networkSearch(from,si) --allows finding
-  -- if not ip.isUUID(from) or not session.checkSession(si) then log("Invalid si or no from address") end
-  -- local rsi=session.newSession(os.getenv("this_ip"),"",1)
-  -- modem.send(from, ports["mnp_reg"],"netsearch",ser.serialize(rsi),ser.serialize({mnp.networkName}))
+function mnp.networkSearch(from,si,data) --allows finding
+  if not ip.isUUID(from) or not session.checkSession(si) then log("Invalid si or no from address") end
+  --check
+  local respond=true
+  for name in pairs(data) do
+    if mnp.networkName==name then respond=false end
+  end
+  if respond then
+    local rsi=session.newSession(os.getenv("this_ip"),"",1)
+    modem.send(from, ports["mnp_reg"],"netsearch",ser.serialize(rsi),ser.serialize({mnp.networkName}))
+  end
 end
 function mnp.networkConnect(from,si,data)
-  -- if not ip.isUUID(from) or not session.checkSession(si) then log("Invalid si or no from address") return false end
-  -- if data then
-  --   if data[1]~=mnp.networkName then return false end
-  -- end
-  -- if si["route"][0]=="0000:0000" then --client
-  --   local rsi=ser.serialize(session.newSession(os.getenv("this_ip")))
-  --   local ipstr=string.sub(os.getenv("this_ip"),1,4)..":"..string.sub(from,1,4)
-  --   modem.send(from,ports["mnp_reg"],"netconnect",rsi,ser.serialize({mnp.networkName,ipstr}))
-  --   ip.addUUID(from)
-  --   --dns
-  --   if data["dns_hostname"] then
-  --     if dns.checkHostname(data["dns_hostname"]) then
-  --       dns.add(ip.findIP(from),data["dns_hostname"],data["dns_protocol"]) --risky
-  --     end
-  --   end
-  --   --confirm
-  --   return true
-  -- elseif ip.isIPv2(si["route"][0],true) then --node
-  --   if ip.findIP(from) then --connected already
-  --     return true end
-  --   local rsi=ser.serialize(session.newSession(os.getenv("this_ip")))
-  --   modem.send(from,ports["mnp_reg"],"netconnect",rsi,ser.serialize({"ok"}))
-  --   ip.addUUID(from,true)
-  --   return true
-  -- else
-  --   log("unknown ip?")
-  --   return false
-  -- end
+  if not ip.isUUID(from) or not session.checkSession(si) then log("Invalid si or no from address") return false end
+  if data then
+    if data[1]~=mnp.networkName then return false end
+  end
+  if si["route"][0]=="0000:0000" then --client
+    local rsi=ser.serialize(session.newSession(os.getenv("this_ip")))
+    local ipstr=string.sub(os.getenv("this_ip"),1,4)..":"..string.sub(from,1,4)
+    modem.send(from,ports["mnp_reg"],"netconnect",rsi,ser.serialize({mnp.networkName,ipstr}))
+    ip.addUUID(from)
+    return true
+  elseif ip.isIPv2(si["route"][0],true) then --node
+    if ip.findIP(from) then return true end --check if already connected
+    local rsi=ser.serialize(session.newSession(os.getenv("this_ip")))
+    modem.send(from,ports["mnp_reg"],"netconnect",rsi,ser.serialize({"ok"}))
+    ip.addUUID(from,true)
+    return true
+  else
+    log("unknown ip?")
+    return false
+  end
 end
 
 function mnp.nodeConnect(connectTime) --on node start, call this
@@ -374,3 +373,4 @@ m-types:
 --connect 12ab:34cd
 --TODO: REDIRECTS
 --IDEA: NODE SOURCE CODE HASH CHECKING
+--CODENAME URBAN ORBIT
