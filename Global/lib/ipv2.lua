@@ -105,14 +105,13 @@ function ip.deleteUUID(g_uuid)
 end
 
 function ip.getNodes(except)
-  local a={}
-  local c=0
+  local res={}
   for n_ip,n_uuid in pairs(nips) do
     if ip.isIPv2(n_ip,true) and n_ip~=except then
-      a[c]=n_uuid c=c+1
+      res[n_ip]=n_uuid
     end
   end
-  return a
+  return res
 end
 
 function ip.getAll() return nips end
