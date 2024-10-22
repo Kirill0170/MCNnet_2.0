@@ -6,7 +6,7 @@ local component=require("component")
 if not component.isAvailable("modem") then error("[IP INIT]: No modem present") end
 local this_uuid=component.getPrimary("modem")["address"]
 local this_ip=os.getenv("this_ip")
-local ip_ver="2.0 BETA"
+local ip_ver="2.01 BETA"
 print("[IP INIT]: Done")
 local nips={} --nips[<ip>]=<uuid>
 local ip={}
@@ -107,7 +107,7 @@ end
 function ip.getNodes(except)
   local res={}
   for n_ip,n_uuid in pairs(nips) do
-    if ip.isIPv2(n_ip,true) and n_ip~=except then
+    if ip.isIPv2(n_ip,true) and n_uuid~=except then
       res[n_ip]=n_uuid
     end
   end
