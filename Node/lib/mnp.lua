@@ -51,7 +51,7 @@ function mnp.mncp_c2cPing(to_ip)
 end
 --MNP------------------------------------
 --Util-
-local function log(text,crit)
+function log(text,crit)
   local res="["..computer.uptime().."]"
   if dolog and crit==0 or not crit then
     print(res.."[MNP/INFO]"..text)
@@ -168,7 +168,67 @@ function mnp.nodeConnect(connectTime) --on node start, call this
   log("debug:exit")
   return true
 end
-function mnp.search(from,sessionInfo) --TODO: error codes
+function mnp.search(from,si)
+  if not ip.isUUID(from) or not session.checkSession(si) then
+     log("Unvalid arguments for search",2)
+     return false
+  end
+  if si["ttl"]<=1 then return false end --drop packet
+  if si["f"]==true then --return
+    to_i=0
+    for i=0,si["c"]-1 do
+      if si["route"][i]==ip.gnip() then
+        to_i=i-1
+        break end
+    end
+    local to_uuid=ip.findUUID(si["route"][to_i])
+    if not to_uuid then
+      log("Couldn't find address to return to while returning search",2)
+      return false
+    end
+    --SAVE
+
+    modem.send(to_uuid,ports["mnp_srch"],"search",ser.serialize(si))
+  else
+    --check local
+    for n_ip,n_uuid in pairs(ip.getAll()) do
+      if n_ip==si["t"] then --found
+        si["f"]=true
+        si["r"]=true
+        si["route"][c-1]=n_ip
+        --dns?
+        modem.send(from,ports["mnp_srch"],"search",ser.serialize(si))
+        return true
+      end
+    end
+    --CHECK SAVED
+
+    --check if looped
+    for i=0,si["c"]-1 do
+      if si["route"][i]==ip.gnip() then return false end
+    end
+    --continue search
+    for n_ip,n_uuid in pair(ip.getNodes(from)) do
+      local ssi=si
+      ssi=session.addIpToSession(ssi,n_ip)
+      ssi["ttl"]=si["ttl"]-1
+      modem.send(n_uuid,ports["mnp_srch"],"search",ser.serialize(ssi))
+    end
+  end
+end
+--[[ session
+[uuid]:<session uuid>
+[t]:<target_ip>
+[ttl]:<time-to-live>
+[c]:<int(num of ips)>
+[0]:<ip(from)>
+[1]:<ip(node)>
+...
+[c-1]:<ip(target)>
+[f]:<found? bool>
+[r]:<reverse? bool>
+]]
+-- function mnp.search(from,sessionInfo) --TODO: error codes
   -- if not ip.isUUID(from) or not session.checkSession(sessionInfo) then
   --   log("Unvalid arguments for search",2)
   --   return false
@@ -224,7 +284,7 @@ function mnp.search(from,sessionInfo) --TODO: error codes
   --     else modem.send(to,ports["mnp_srch"],"search",ser.serialize(si)) end
   --   end
   -- end
-end
+-- end
 
 function mnp.dnsLookup(from,sessionInfo,data) --TODO: return error codes
   -- if not ip.isUUID(from) or not session.checkSession(sessionInfo) or not data then
