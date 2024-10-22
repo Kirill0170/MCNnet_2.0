@@ -98,6 +98,12 @@ function ip.deleteIP(g_ip)
   nips[g_ip]=nil return true
 end
 
+function ip.deleteUUID(g_uuid)
+  for n_ip,n_uuid in pairs(nips) do
+    if n_uuid==g_uuid then nips[g_ip]=nil end
+  end
+end
+
 function ip.getNodes(except)
   local a={}
   local c=0

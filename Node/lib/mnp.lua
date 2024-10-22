@@ -128,6 +128,10 @@ function mnp.networkConnect(from,si,data)
     return true
   elseif ip.isIPv2(si["route"][0],true) then --node
     if ip.findIP(from) then return true end --check if already connected
+    --check found table
+    for f_ip in pairs(data[2]) do
+      if f_ip==ip.gnip() then return true end
+    end
     local rsi=ser.serialize(session.newSession(os.getenv("this_ip")))
     modem.send(from,ports["mnp_reg"],"netconnect",rsi,ser.serialize({"ok"}))
     ip.addUUID(from,true)
@@ -139,28 +143,30 @@ function mnp.networkConnect(from,si,data)
 end
 
 function mnp.nodeConnect(connectTime) --on node start, call this
-  -- if not tonumber(connectTime) then connectTime=10 end
-  -- if not ip.isIPv2(os.getenv("this_ip"),true) then return false end
-  -- local rsi=session.newSession()
-  -- local timerName="nc"..computer.uptime()
-  -- thread.create(timer,connectTime,timerName):detach()
-  -- local exit=false
-  -- while not exit do
-  --   modem.broadcast(ports["mnp_reg"],"netconnect",ser.serialize(rsi),ser.serialize({mnp.networkName}))
-  --   local id,name,from,port,dist,mtype,si=event.pullMultiple("interrupted","timeout","modem")
-  --   if id=="timeout" or id=="interrupted" then
-  --     exit=true
-  --     log("timeout")
-  --   else
-  --     local si=ser.unserialize(si)
-  --     if ip.isIPv2(si["route"][0],true) then
-  --       ip.addUUID(from,true)
-  --       log("registered new node")
-  --     end
-  --   end
-  -- end
-  -- log("debug:exit")
-  -- return true
+  if not tonumber(connectTime) then connectTime=10 end
+  if not ip.isIPv2(os.getenv("this_ip"),true) then return false end
+  local rsi=session.newSession()
+  local timerName="nc"..computer.uptime()
+  thread.create(timer,connectTime,timerName):detach()
+  local exit=false
+  local found={} --for found ips
+  while not exit do
+    modem.broadcast(ports["mnp_reg"],"netconnect",ser.serialize(rsi),ser.serialize({mnp.networkName,found}))
+    local id,name,from,port,dist,mtype,si=event.pullMultiple("interrupted","timeout","modem")
+    if id=="timeout" or id=="interrupted" then
+      exit=true
+      log("timeout")
+    else
+      local si=ser.unserialize(si)
+      if ip.isIPv2(si["route"][0],true) then
+        table.insert(found,si["route"][0])
+        ip.addUUID(from,true)
+        log("registered new node")
+      end
+    end
+  end
+  log("debug:exit")
+  return true
 end
 function mnp.search(from,sessionInfo) --TODO: error codes
   -- if not ip.isUUID(from) or not session.checkSession(sessionInfo) then
