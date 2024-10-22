@@ -50,7 +50,7 @@ local function connection(from,port,mtype,si,data)
   elseif mtype=="netdisconnect" then
     mnp.networkDisconnect(from)
   elseif mtype=="netsearch" then
-    mnp.networkSearch(from,si)
+    mnp.networkSearch(from,si,data)
   elseif mtype=="search" then
     mnp.search(from,si)
   elseif mtype=="dns_lookup" then
