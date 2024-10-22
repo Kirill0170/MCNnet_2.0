@@ -1,5 +1,5 @@
 --MNP CONNECTION MANAGER for client
-local ver="ALPHA 0.65"
+local ver="ALPHA 0.66"
 local filename="/usr/.cm_last_netname"
 local mnp=require("cmnp")
 local term=require("term")
@@ -166,6 +166,11 @@ local function roundTime(value)
   return math.floor(value*100+0.5)/100
 end
 local function pingNode(n,t)
+  local this_ip=os.getenv("this_ip")
+  if not this_ip or not this_ip=="0000:0000" then
+    cprint("Not connected.",0xFF0000)
+    return false
+  end
   if n then
     if not tonumber(n) then cprint("--n should be given a number, defaulting to 1.",0xFFCC33) n=1 end
     n=tonumber(n)
