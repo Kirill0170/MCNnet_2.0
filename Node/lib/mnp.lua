@@ -96,7 +96,7 @@ function mnp.closeNode()--!review!
   log("Closing node, disconnecting everyone...")
   local nips=ip.getAll()
   for n_ip,n_uuid in pairs(nips) do
-    local si=ser.serialize(session.newSession(ip.gnip(),n_ip,1))
+    local si=ser.serialize(session.newSession(n_ip,1))
     modem.send(n_uuid,ports["mnp_reg"],"netdisconnect",si,ser.serialize({mnp.networkName}))
   end
 end
@@ -111,7 +111,7 @@ function mnp.networkSearch(from,si,data) --allows finding
     if mnp.networkName==name then respond=false end
   end
   if respond then
-    local rsi=session.newSession(os.getenv("this_ip"),"",1)
+    local rsi=session.newSession("",1)
     modem.send(from, ports["mnp_reg"],"netsearch",ser.serialize(rsi),ser.serialize({mnp.networkName}))
   end
 end
@@ -121,7 +121,7 @@ function mnp.networkConnect(from,si,data)
     if data[1]~=mnp.networkName then return false end
   end
   if si["route"][0]=="0000:0000" then --client
-    local rsi=ser.serialize(session.newSession(os.getenv("this_ip")))
+    local rsi=ser.serialize(session.newSession())
     local ipstr=string.sub(os.getenv("this_ip"),1,4)..":"..string.sub(from,1,4)
     modem.send(from,ports["mnp_reg"],"netconnect",rsi,ser.serialize({mnp.networkName,ipstr}))
     ip.addUUID(from)
@@ -132,7 +132,7 @@ function mnp.networkConnect(from,si,data)
     for f_ip in pairs(data[2]) do
       if f_ip==ip.gnip() then return true end
     end
-    local rsi=ser.serialize(session.newSession(os.getenv("this_ip")))
+    local rsi=ser.serialize(session.newSession())
     modem.send(from,ports["mnp_reg"],"netconnect",rsi,ser.serialize({"ok"}))
     ip.addUUID(from,true)
     return true
@@ -190,6 +190,10 @@ function mnp.search(from,si)
 
     modem.send(to_uuid,ports["mnp_srch"],"search",ser.serialize(si))
   else
+    --check if no current
+    if si["route"][si["c"]-1]~=ip.gnip() then
+      si=session.addIpToSession(si,ip.gnip())
+    end
     --check local
     for n_ip,n_uuid in pairs(ip.getAll()) do
       if n_ip==si["t"] then --found
