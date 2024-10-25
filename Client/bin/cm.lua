@@ -1,5 +1,5 @@
 --MNP CONNECTION MANAGER for client
-local ver="ALPHA 0.67"
+local ver="ALPHA 0.7"
 local filename="/usr/.cm_last_netname"
 local mnp=require("cmnp")
 local term=require("term")
@@ -131,13 +131,9 @@ local function connect(name)
       return false
     end
   end
-  local saved=mnp.loadSavedNodes()
-  if saved=={} then 
-    cprint("Saved node address not found. Use 'cm search' to search for networks",0xFFCC33)
-    return false end --OR netsearch
-  local address=mnp.getSavedAddress(saved,name)
+  local address=mnp.getSavedNode(name)
   if not address then 
-    cprint("Saved node address not found. Use 'cm search' to search for networks",0xFFCC33)
+    cprint("Saved node addresses not found. Use 'cm search' to search for networks",0xFFCC33)
     return false end
   print("Trying to connect to "..name)
   savePrevName(name)
@@ -207,3 +203,4 @@ elseif args[1]=="search" then search(ops["s"],ops["p"])
 elseif args[1]=="nping" then pingNode(ops["n"],ops["t"])
 elseif args[1]=="connect" then connect(args[2])
 else help() end 
+--idea: networks: just display netnames to connect to
