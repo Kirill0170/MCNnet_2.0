@@ -1,7 +1,8 @@
 --Mcn-net Networking Protocol for Client v2.1 EXPERIMENTAL
 --Modem is required.
 local dolog=false --log
-local saveFileName="/usr/.mnpSavedBuffer.sb"-- array[netname]=from
+local networkSaveFileName="/usr/.mnpSavedNetworks.sb"-- array[netname]=<uuid-address>
+local routeSaveFileName="/usr/.mnpSavedRoutes.sb" --array[to_ip]=<route>
 local component=require("component")
 local computer=require("computer")
 local ser=require("serialization")
@@ -42,16 +43,16 @@ local function timer(time,name)
   computer.pushSignal("timeout",name)
 end
 --MNCP-----------------------------------
-function mnp.mncp_CliService()
-  if not modem.isOpen(ports["mncp_srvc"]) then modem.open(ports["mncp_srvc"]) end
-  log("Started MNCP service")
-  while true do
-    local _,_,from,port,_,mtype,si=event.pull("modem")
-    if port==ports["mncp_srvc"] and mtype=="mncp_check" then
-      local to_ip=ser.unserialize(si)["route"][0]
-      modem.send(from,ports["mncp_srvc"],"mncp_check",ser.serialize(session.newSession(os.getenv("this_ip"),to_ip,2)))
-    end
-  end
+function mnp.mncp_CliService() --REDO
+  -- if not modem.isOpen(ports["mncp_srvc"]) then modem.open(ports["mncp_srvc"]) end
+  -- log("Started MNCP service")
+  -- while true do
+  --   local _,_,from,port,_,mtype,si=event.pull("modem")
+  --   if port==ports["mncp_srvc"] and mtype=="mncp_check" then
+  --     local to_ip=ser.unserialize(si)["route"][0]
+  --     modem.send(from,ports["mncp_srvc"],"mncp_check",ser.serialize(session.newSession(os.getenv("this_ip"),to_ip,2)))
+  --   end
+  -- end
 end
 function mnp.mncp_nodePing(timeoutTime)
   if not modem.isOpen(ports["mncp_ping"]) then modem.open(ports["mncp_ping"]) end
@@ -124,29 +125,37 @@ function mnp.toggleLog(change)
     return true
   else return false end
 end
---Saving Node Addresses--
-function mnp.setSaveFileName(newName) saveFileName=newName end
+----------Saving Node Addresses------------
+function mnp.setNetworkSaveFileName(newName) networkSaveFileName=newName end
 function mnp.loadSavedNodes()
-  local file=io.open(saveFileName,"r")
+  local file=io.open(networkSaveFileName,"r")
   if not file then --initialize file
-    file=io.open(saveFileName,"w")
+    file=io.open(networkSaveFileName,"w")
     file:write(ser.serialize({}))
     file:close()
     return {}
   end
   savedata=ser.unserialize(file:read("*a"))
   file:close()
-  if savedata=="" or savedata==nil then return {}
-  else return savedata end
+  savedata2={}
+  --checks
+  if type(savedata)~="table" then return {} end
+  for netname,n_uuid in pairs(savedata) do
+    if ip.isUUID(n_uuid) then
+      savedata2[netname]=n_uuid
+    end
+  end
+  return savedata2
 end
 function mnp.saveNodes(table)
   if type(table)~="table" then return false end
-  local file=io.open(saveFileName, "w")
+  local file=io.open(networkSaveFileName, "w")
   file:write(ser.serialize(table))
   file:close()
   return true
 end
-function mnp.getSavedAddress(table,networkName)
+function mnp.getSavedNode(networkName)
+  local table=mnp.loadSavedNodes()
   for netname,from in pairs(table) do
     if netname==networkName then return from end 
   end
@@ -157,12 +166,53 @@ function mnp.checkHostname(name) --imported from dns.lua
   local pattern = "^%w+%.%w+$"
   return string.match(name, pattern) ~= nil
 end
+-----------Saving searched routes------------
+function mnp.setRouteSaveFileName(newName) routeSaveFileName=newName end
+function mnp.loadRoutes()
+  local file=io.open(routeSaveFileName,"r")
+  if not file then --initialize file
+    file=io.open(routeSaveFileName,"w")
+    file:write(ser.serialize({}))
+    file:close()
+    return {}
+  end
+  savedata=ser.unserialize(file:read("*a"))
+  file:close()
+  savedata2={}
+  --checks
+  if type(savedata)~="table" then return {} end
+  for s_ip,route in pairs(savedata) do
+    if ip.isIPv2(s_ip) and session.checkRoute(route) then
+      savedata2[s_ip]=route
+    end
+  end
+  return savedata2
+end
+function mnp.getSavedRoute(to_ip)
+  if not ip.isIPv2(to_ip) then return nil end
+  local saved=mnp.loadRoutes()
+  if saved=={} then return nil end
+  return saved[to_ip]
+end
+function mnp.saveRoute(to_ip,si)
+  if not session.checkSession(si) or not ip.isIPv2(to_ip) then return false end
+  local route=si["route"]
+  local saved=mnp.loadRoutes()
+  saved[to_ip]=si
+  local file=io.open(setRouteSaveFileName,"w")
+  file:write(ser.serialize(saved))
+  file:close()
+  return true
+end
 --Main-
 function mnp.networkSearch(searchTime,save)
   if not searchTime then searchTime=10 end
   local saveTable=nil
   if save then
     saveTable=mnp.loadSavedNodes()
+  end
+  if not ip.isIPv2(os.getenv("this_ip")) then
+    os.setenv("this_ip","0000:0000")
   end
   local res={}--res[netname]={from,dist}
   local timerName="ns"..computer.uptime()
@@ -187,12 +237,15 @@ function mnp.networkSearch(searchTime,save)
     end
   end
   if save then mnp.saveNodes(saveTable) end
-  return res
+  return res --table[netname]={<uuid>,dist}
 end
 
 function mnp.networkConnectByName(from,name)
   if not name then return false end
-  local rsi=ser.serialize(session.newSession(os.getenv("this_ip")))
+  if not ip.isIPv2(os.getenv("this_ip")) then
+    os.setenv("this_ip","0000:0000")
+  end
+  local rsi=ser.serialize(session.newSession(os.getenv("this_ip")))--!!
   local sdata={name}
   modem.send(from,ports["mnp_reg"],"netconnect",rsi,ser.serialize(sdata))
   while true do
@@ -233,6 +286,7 @@ end
 
 function mnp.isConnected(ping)
   if ip.isUUID(os.getenv("node_uuid")) and ip.isIPv2(os.getenv("this_ip")) then
+    if os.getenv("this_ip")=="0000:0000" then return false end
     if ping then
       if not mnp.mncp_nodePing(1) then return false end
       return true
@@ -242,7 +296,43 @@ function mnp.isConnected(ping)
   return false
 end
 
-function mnp.search(to_ip,searchTime)--check si
+function mnp.search(to_ip,searchTime)
+  if not mnp.isConnected() then return false end
+  if not ip.isIPv2(to_ip) then return false end
+  if not searchTime then searchTime=120 end
+  local timerName="ms"..computer.uptime() --feel free to change first string
+  local timerName="mnpsrch"..computer.uptime()
+  local si=session.newSession()--/shrug
+  log("Started search for "..to_ip)
+  modem.send(os.getenv("node_uuid"),ports["mnp_srch"],"search",ser.serialize(si))
+  while true do
+    local id,name,from,port,_,mtype,rsi=event.pullMultiple(1,"modem","interrupted","timeout")
+    if id=="interrupted" then break
+    elseif id=="timeout" then
+      if name==timerName then break end
+    else
+      if from==os.getenv("node_uuid") and port==ports["mnp_srch"] and mtype=="search" then
+        rsi=ser.unserialize(rsi)
+        if rsi["f"]==true and rsi["route"][#rsi["route"]]==to_ip then
+          mnp.saveRoute(to_ip,rsi)
+          return true
+        else --error
+          if rsi["route"][#rsi["route"]]~="to_ip" then --traceback
+            log("Search failed: incorrect final ip",1)
+            log("Route stack:",1)
+            for i in pairs(rsi["route"]) do
+              log("<route:"..tostring(i)..">:"..rsi["route"][i],1)
+            end
+            return false
+          end
+        end
+      end
+    end
+  end
+  log("Search failed: timeout",1)
+  return false
+end
+-- function mnp.search(to_ip,searchTime)--check si
   -- if not mnp.isConnected() then return false end
   -- if not to_ip then return false end
   -- if not searchTime then searchTime=300 end
@@ -274,7 +364,7 @@ function mnp.search(to_ip,searchTime)--check si
   -- end
   -- log("Search failed: timeout",1)
   -- return false
-end
+-- end
 function mnp.dnslookup(hostname,searchTime) --fix: check si
   -- if not mnp.isConnected() then return false end
   -- if not hostname then return false end
