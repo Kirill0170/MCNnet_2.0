@@ -1,6 +1,6 @@
 local ip=require("ipv2")
 local computer=require("computer")
-local version="1.4 EXPERIMENTAL"
+local version="1.42 EXPERIMENTAL"
 local session={}
 local dolog=true
 local function log(text)
@@ -20,12 +20,10 @@ function session.checkSession(sessionInfo) --log for debug
     end
     return true
 end
-function session.newSession(from_ip,to_ip,ttl)
-    if not ip.isIPv2(from_ip) then
-        if ip.isIPv2(os.getenv("this_ip")) then --try to use default
-            from_ip=os.getenv("this_ip")
-        else return nil end
-    end
+function session.newSession(to_ip,ttl)
+    if ip.isIPv2(os.getenv("this_ip")) then --try to use default
+        from_ip=os.getenv("this_ip")
+    else return nil end
     if to_ip=="dns_lookup" then --pass
     elseif not ip.isIPv2(to_ip) or not to_ip then to_ip="broadcast" end
     if not tonumber(ttl) then ttl=16 end
