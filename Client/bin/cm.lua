@@ -1,5 +1,5 @@
 --MNP CONNECTION MANAGER for client
-local ver="ALPHA 0.66"
+local ver="ALPHA 0.67"
 local filename="/usr/.cm_last_netname"
 local mnp=require("cmnp")
 local term=require("term")
@@ -87,7 +87,6 @@ local function search(s,p)
   if p==true then mnp.toggleLog(true)
   elseif s==true then mnp.toggleLog(false) end
   print("Searching for networks...")
-  os.setenv("this_ip","0000:0000")
   local rsi=mnp.networkSearch(5,true) --res[netname]={from,dist}
   if not next(rsi) then cprint("No networks found",0xFFCC33)
   else
@@ -142,7 +141,6 @@ local function connect(name)
     return false end
   print("Trying to connect to "..name)
   savePrevName(name)
-  os.setenv("this_ip","0000:0000")
   mnp.networkConnectByName(address,name)
 end
 
@@ -166,8 +164,7 @@ local function roundTime(value)
   return math.floor(value*100+0.5)/100
 end
 local function pingNode(n,t)
-  local this_ip=os.getenv("this_ip")
-  if not this_ip or not this_ip=="0000:0000" then
+  if not mnp.isConnected() then
     cprint("Not connected.",0xFF0000)
     return false
   end
