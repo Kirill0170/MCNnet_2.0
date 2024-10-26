@@ -13,7 +13,7 @@ local event=require("event")
 local ip=require("ipv2")
 local dns=require("dns")
 local gpu=component.gpu
-local mnp_ver="2.3 REWORK INDEV"
+local mnp_ver="2.35 REWORK INDEV"
 local mncp_ver="2.3 REWORK INDEV"
 local forbidden_vers={}
 forbidden_vers["mnp"]={"2.21 EXPERIMENTAL"}
@@ -135,6 +135,7 @@ function mnp.networkConnect(from,si,data)
     local rsi=ser.serialize(session.newSession())
     modem.send(from,ports["mnp_reg"],"netconnect",rsi,ser.serialize({"ok"}))
     ip.addUUID(from,true)
+    log("registered new node")
     return true
   else
     log("unknown ip?")
@@ -212,7 +213,7 @@ function mnp.search(from,si) --REWRITE: SESSION HAS NO C
       if si["route"][i]==ip.gnip() then return false end
     end
     --continue search
-    for n_ip,n_uuid in pair(ip.getNodes(from)) do
+    for n_ip,n_uuid in pairs(ip.getNodes(from)) do
       local ssi=si
       ssi=session.addIpToSession(ssi,n_ip)
       ssi["ttl"]=si["ttl"]-1
