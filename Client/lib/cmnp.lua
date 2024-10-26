@@ -194,12 +194,11 @@ function mnp.getSavedRoute(to_ip)
   if saved=={} then return nil end
   return saved[to_ip]
 end
-function mnp.saveRoute(to_ip,si)
-  if not session.checkSession(si) or not ip.isIPv2(to_ip) then return false end
-  local route=si["route"]
+function mnp.saveRoute(to_ip,route)
+  if not session.checkRoute(route) or not ip.isIPv2(to_ip) then return false end
   local saved=mnp.loadRoutes()
   saved[to_ip]=si
-  local file=io.open(setRouteSaveFileName,"w")
+  local file=io.open(routeSaveFileName,"w")
   file:write(ser.serialize(saved))
   file:close()
   return true
@@ -302,9 +301,12 @@ function mnp.search(to_ip,searchTime)
   if not searchTime then searchTime=120 end
   local timerName="ms"..computer.uptime() --feel free to change first string
   local timerName="mnpsrch"..computer.uptime()
-  local si=session.newSession()--/shrug
+  local si=session.newSession(to_ip)
+  mnp.openPorts()
   log("Started search for "..to_ip)
   modem.send(os.getenv("node_uuid"),ports["mnp_srch"],"search",ser.serialize(si))
+  local start_time=computer.uptime()
+  thread.create(timer,searchTime,timerName):detach()
   while true do
     local id,name,from,port,_,mtype,rsi=event.pullMultiple(1,"modem","interrupted","timeout")
     if id=="interrupted" then break
@@ -314,7 +316,7 @@ function mnp.search(to_ip,searchTime)
       if from==os.getenv("node_uuid") and port==ports["mnp_srch"] and mtype=="search" then
         rsi=ser.unserialize(rsi)
         if rsi["f"]==true and rsi["route"][#rsi["route"]]==to_ip then
-          mnp.saveRoute(to_ip,rsi)
+          mnp.saveRoute(to_ip,rsi["route"])
           return true
         else --error
           if rsi["route"][#rsi["route"]]~="to_ip" then --traceback

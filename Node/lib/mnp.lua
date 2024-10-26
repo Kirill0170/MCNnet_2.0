@@ -168,7 +168,7 @@ function mnp.nodeConnect(connectTime) --on node start, call this
   log("debug:exit")
   return true
 end
-function mnp.search(from,si)
+function mnp.search(from,si) --REWRITE: SESSION HAS NO C
   if not ip.isUUID(from) or not session.checkSession(si) then
      log("Unvalid arguments for search",2)
      return false
@@ -176,7 +176,7 @@ function mnp.search(from,si)
   if si["ttl"]<=1 then return false end --drop packet
   if si["f"]==true then --return
     to_i=0
-    for i=0,si["c"]-1 do
+    for i=0,#si["route"] do
       if si["route"][i]==ip.gnip() then
         to_i=i-1
         break end
@@ -191,7 +191,7 @@ function mnp.search(from,si)
     modem.send(to_uuid,ports["mnp_srch"],"search",ser.serialize(si))
   else
     --check if no current
-    if si["route"][si["c"]-1]~=ip.gnip() then
+    if si["route"][#si["route"]]~=ip.gnip() then
       si=session.addIpToSession(si,ip.gnip())
     end
     --check local
@@ -199,7 +199,7 @@ function mnp.search(from,si)
       if n_ip==si["t"] then --found
         si["f"]=true
         si["r"]=true
-        si["route"][c-1]=n_ip
+        si=session.addIpToSession(si,n_ip)
         --dns?
         modem.send(from,ports["mnp_srch"],"search",ser.serialize(si))
         return true
@@ -208,7 +208,7 @@ function mnp.search(from,si)
     --CHECK SAVED
 
     --check if looped
-    for i=0,si["c"]-1 do
+    for i=0,#si["route"] do
       if si["route"][i]==ip.gnip() then return false end
     end
     --continue search
