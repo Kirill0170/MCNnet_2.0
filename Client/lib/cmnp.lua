@@ -299,7 +299,7 @@ function mnp.search(to_ip,searchTime)
   if not mnp.isConnected() then return false end
   if not ip.isIPv2(to_ip) then return false end
   if not searchTime then searchTime=120 end
-  local timerName="ms"..computer.uptime() --feel free to change first string
+  local timerName="ms"..computer.uptime()
   local timerName="mnpsrch"..computer.uptime()
   local si=session.newSession(to_ip)
   mnp.openPorts()
@@ -425,15 +425,19 @@ function mnp.server_connection(si,data,connectedList) --for server REWRITE
   si["r"]=true
   modem.send(si["route"][#si["route"]-1],"connection",ser.serialize(si),ser.serialize(data))
 end
-function mnp.send(to_ip,mtype,data) --REVIEW
-  if not mnp.isConnected() then return false end
+function mnp.send(to_ip,mtype,data)
+  if not mnp.isConnected() then return 1 end
   if not mtype then mtype="data" end
   if not data then data={} end
-  local si=mnp.getPattern(to_ip)
-  if not si then return false end
-  si["r"]=false
+  local route=mnp.getSavedRoute(to_ip)
+  if not route then
+    log("No route to "..to_ip)
+    return 2
+  end
+  local si=session.newSession(to_ip,route)
   to_uuid=os.getenv("node_uuid")
   modem.send(to_uuid,ports["mnp_data"],mtype,ser.serialize(si),ser.serialize(data))
+  return 0
 end
 function mnp.sendBack(mtype,si,data)--REVIEW
   if not mnp.isConnected() then return false end

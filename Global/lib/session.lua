@@ -29,7 +29,7 @@ function session.checkSession(sessionInfo) --log for debug
     end
     return true
 end
-function session.newSession(to_ip,ttl,route)
+function session.newSession(to_ip,route,ttl)
     from_ip=""
     if ip.isIPv2(os.getenv("this_ip")) then --try to use default
         from_ip=os.getenv("this_ip")
