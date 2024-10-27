@@ -1,6 +1,6 @@
 local ip=require("ipv2")
 local computer=require("computer")
-local version="1.52 EXPERIMENTAL"
+local version="1.6 EXPERIMENTAL"
 local session={}
 local dolog=true
 function log(text)
@@ -29,7 +29,7 @@ function session.checkSession(sessionInfo) --log for debug
     end
     return true
 end
-function session.newSession(to_ip,ttl)
+function session.newSession(to_ip,ttl,route)
     from_ip=""
     if ip.isIPv2(os.getenv("this_ip")) then --try to use default
         from_ip=os.getenv("this_ip")
@@ -40,8 +40,12 @@ function session.newSession(to_ip,ttl)
     local newSession={}
     newSession["uuid"]=require("uuid").next()
     newSession["t"]=to_ip
-    newSession["route"]={}
-    newSession["route"][0]=from_ip
+    if session.checkRoute(route) then
+        newSession["route"]=route
+    else
+        newSession["route"]={}
+        newSession["route"][0]=from_ip
+    end
     newSession["ttl"]=tonumber(ttl)
     return newSession
 end
