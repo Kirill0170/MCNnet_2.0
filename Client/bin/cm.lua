@@ -124,6 +124,7 @@ local function search(s,p)
 end
 
 local function connect(name)
+  mnp.openPorts()
   if not name then--check previous name
     name=loadPrevName()
     if not name then

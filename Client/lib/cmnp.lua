@@ -44,15 +44,18 @@ local function timer(time,name)
 end
 --MNCP-----------------------------------
 function mnp.mncp_CliService() --REDO
-  -- if not modem.isOpen(ports["mncp_srvc"]) then modem.open(ports["mncp_srvc"]) end
-  -- log("Started MNCP service")
-  -- while true do
-  --   local _,_,from,port,_,mtype,si=event.pull("modem")
-  --   if port==ports["mncp_srvc"] and mtype=="mncp_check" then
-  --     local to_ip=ser.unserialize(si)["route"][0]
-  --     modem.send(from,ports["mncp_srvc"],"mncp_check",ser.serialize(session.newSession(os.getenv("this_ip"),to_ip,2)))
-  --   end
-  -- end
+  if not modem.isOpen(ports["mncp_srvc"]) then modem.open(ports["mncp_srvc"]) end
+  log("Started MNCP service")
+  while true do
+    local id,_,from,port,_,mtype,si=event.pullMultiple("modem","mncp_cliSrvc_stop")
+    if id=="mncp_cliSrvc_stop" then break end
+    if port==ports["mncp_srvc"] and mtype=="mncp_check" then
+      local si=ser.unserialize(si)
+      si["r"]=~si["r"]
+      local to_ip=si["route"][0]
+      modem.send(from,ports["mncp_srvc"],"mncp_check",ser.serialize(session.newSession()))
+    end
+  end
 end
 function mnp.mncp_nodePing(timeoutTime)
   if not modem.isOpen(ports["mncp_ping"]) then modem.open(ports["mncp_ping"]) end
@@ -197,7 +200,7 @@ end
 function mnp.saveRoute(to_ip,route)
   if not session.checkRoute(route) or not ip.isIPv2(to_ip) then return false end
   local saved=mnp.loadRoutes()
-  saved[to_ip]=si
+  saved[to_ip]=route
   local file=io.open(routeSaveFileName,"w")
   file:write(ser.serialize(saved))
   file:close()
