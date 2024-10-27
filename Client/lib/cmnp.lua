@@ -334,39 +334,6 @@ function mnp.search(to_ip,searchTime)
   log("Search failed: timeout",1)
   return false
 end
--- function mnp.search(to_ip,searchTime)--check si
-  -- if not mnp.isConnected() then return false end
-  -- if not to_ip then return false end
-  -- if not searchTime then searchTime=300 end
-  -- local timerName="ms"..computer.uptime() --feel free to change first string
-  -- local si=ser.serialize(session.newSession(to_ip))
-  -- modem.send(os.getenv("node_uuid"),ports["mnp_srch"],"search",si)
-  -- log("Stated search...")
-  -- local start_time=computer.uptime()
-  -- thread.create(timer,searchTime,timerName):detach()
-  -- while true do
-  --   local id,name,from,port,_,mtype,rsi=event.pullMultiple(1,"modem","interrupted","timeout")
-  --   if id=="interrupted" then
-  --     break
-  --   elseif id=="timeout" then
-  --     if name==timerName then break end
-  --   else
-  --     if port==ports["mnp_srch"] and from==os.getenv("n_uuid") and mtype=="search" then
-  --       rsi=ser.unserialize(rsi)
-  --       if not rsi["f"] then
-  --         log("Search received SessionInfo with f=false/nil - Doing nothing",1)
-  --       else
-  --         --save session
-  --         mnp.savePattern(rsi["t"],rsi)
-  --         log("Search completed, took "..computer.uptime()-start_time)
-  --         return true
-  --       end
-  --     end
-  --   end
-  -- end
-  -- log("Search failed: timeout",1)
-  -- return false
--- end
 function mnp.dnslookup(hostname,searchTime) --fix: check si
   -- if not mnp.isConnected() then return false end
   -- if not hostname then return false end
