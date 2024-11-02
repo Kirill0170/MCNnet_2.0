@@ -1,4 +1,4 @@
-local version="1.1 indev"
+local version="1.2 indev rework"
 local dolog=true
 local component=require("component")
 local computer=require("computer")
@@ -42,14 +42,10 @@ end
 function ssap.getVersion() return version end
 --Main--
 function ssap.clientConnect(to_ip,timeoutTime)--REDO AND FIX ISSUES
-  if not to_ip or not ip.isIPv2(to_ip) then return false end
+  if not ip.isIPv2(to_ip) then return false end
   if not cmnp.isConnected() then return false end
-  if not cmnp.isConnectedToServer(to_ip) then return false end
   if not timeoutTime then timeoutTime=10 end --ssap connection should be fast
-  local data={}
-  data[1]="init"
-  data[2]={}
-  data[3]={}
+  local data={"init",{},{}}
   data[2]["version"]=version
   cmnp.send(to_ip,"ssap",data)
   local rdata=cmnp.receive(to_ip,"ssap",timeoutTime)
@@ -72,7 +68,7 @@ function ssap.clientConnect(to_ip,timeoutTime)--REDO AND FIX ISSUES
 end
 function ssap.serverConnectionManager(filename) --no UAP support
   local fs=require("filesystem")
-  if not fs.exists(filename) then
+  if not fs.exists("/lib/"..filename..".luaw") then
     log("Couldn't start SSAP CM: no such file: "..filename,2)
     return false
   end
@@ -88,7 +84,7 @@ function ssap.serverConnectionManager(filename) --no UAP support
       break
     else
       if mtype=="ssap" then
-        data=ser.unserialze(data)
+        data=ser.unserialize(data)
         if data[1]=="init" then
           rdata={}
           rdata[1]="init"
@@ -109,7 +105,7 @@ function ssap.serverConnectionManager(filename) --no UAP support
   end
 end
 function ssap.application(filepath,to_ip)
-  if not require("filesystem").exists(filepath) then
+  if not require("filesystem").exists("/lib/"..filepath..".lua") then
     log("Could not open application file",3)
   end
   local app=require(filepath)
@@ -151,8 +147,8 @@ function ssap.clientConnection(server_ip,timeoutTime)--REDO THIS USING DEDICATED
       log("Disconnected: exit")
       return 0
     elseif rdata[1]=="text" then
-      if rdata[2]["bg_color"] then gpu.setBackground(rdata[2]["bg_color"]) end
-      if rdata[2]["fg_color"] then gpu.setForeground(rdata[2]["fg_color"]) end
+      if rdata[2]["bg_color"] then gpu.setBackground(tonumber(rdata[2]["bg_color"])) end
+      if rdata[2]["fg_color"] then gpu.setForeground(tonumber(rdata[2]["fg_color"])) end
       if rdata[2]["x"] and rdata[2]["y"] then
         term.setCursor(tonumber(rdata[2]["x"]),tonumber(rdata[2]["y"]))
         term.write(rdata[3][1])

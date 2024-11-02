@@ -209,9 +209,9 @@ function mnp.search(from,si) --REWRITE: SESSION HAS NO C
     --CHECK SAVED
 
     --check if looped
-    for i=0,#si["route"] do
-      if si["route"][i]==ip.gnip() then return false end
-    end
+    -- for i=0,#si["route"] do
+    --   if si["route"][i]==ip.gnip() then return false end
+    -- end
     --continue search
     for n_ip,n_uuid in pairs(ip.getNodes(from)) do
       local ssi=si
@@ -292,7 +292,12 @@ function mnp.pass(port,mtype,si,data)
   local to
   if si["r"]==true then to=ip.findUUID(si[tonumber(num-1)])
   else to=ip.findUUID(si["route"][tonumber(num+1)]) end
-  if not to then log("Unsuccessful dns lookup: Unknown IP",2)
+  if not to then log("Unsuccessful pass: Unknown IP",2)
+    log("Route crude:"..ser.serialize(si["route"]),1)
+    log("Route stack:",1)
+    for i in pairs(si["route"]) do
+      log("<route:"..tostring(i)..">:"..rsi["route"][i],1)
+    end
   else modem.send(to,ports["mnp_data"],mtype,ser.serialize(si),ser.serialize(data)) end
   return true
 end
@@ -374,3 +379,7 @@ m-types:
 --TODO: REDIRECTS
 --IDEA: NODE SOURCE CODE HASH CHECKING
 --CODENAME URBAN ORBIT
+
+
+--REWORK
+--TODO: RESET NIPS WHEN RESTARTING

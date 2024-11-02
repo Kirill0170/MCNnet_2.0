@@ -28,18 +28,18 @@ function connection(to_ip,timeout)
   if timeout then
     if not tonumber(timeout) then cprint("--t should be given a number, defaulting to 10",0xFFCC33) timeout=10 end
   else timeout=10 end
-  mnp.loadSavedPatterns()
-  if not mnp.getPattern(to_ip) then
+  if not mnp.getSavedRoute(to_ip) then
     cprint("No route to "..to_ip.." found. searching...",0xFFCC33)
     if not mnp.search(to_ip) then
       cprint("Failed search",0xFFCC33)
       return false 
     end
   end
-  if not mnp.getPattern(to_ip) then cprint("Couldn't get session info pattern for "..to_ip,2) return false end
-  if not mnp.connect(to_ip) then cprint("Couldn't connect to server: "..to_ip..".",2) return false end 
+  if not mnp.getSavedRoute(to_ip) then cprint("Couldn't get route for "..to_ip,2) return false end
   if not ssap.clientConnect(to_ip,timeout) then
-      print("Exiting")
+    print("Exiting")
+  else
+    ssap.clientConnection(to_ip,timeout)
   end
 end
 --main
