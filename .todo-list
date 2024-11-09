@@ -1,5 +1,7 @@
 port support for client-node connenctions
 DNS for clients
+MNP: network-wide admin operations:
+  get_network
 --future--
 UAP: security protocol for mcnnet
 Package manager: connect to package servers and download/update stuff uisng version control system
