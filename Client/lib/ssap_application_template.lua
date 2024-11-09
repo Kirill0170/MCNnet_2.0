@@ -14,9 +14,9 @@ config["name"]="app" --your application name
 config["log"]=true --log stuff
 
 local styles={} -- configure styles here
-styles["example"]={}
+styles["example"]={} --red text
 styles["example"]["bg_color"]="0x000000"
-styles["example"]["fg_color"]="0xFFFFEE"
+styles["example"]["fg_color"]="0xFF0000"
 
 --DO NOT EDIT BELOW
 local ssap=require("ssap")

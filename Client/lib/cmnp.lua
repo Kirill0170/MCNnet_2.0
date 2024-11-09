@@ -12,7 +12,7 @@ local thread=require("thread")
 local event=require("event")
 local ip=require("ipv2")
 local gpu=component.gpu
-local mnp_ver="2.3 REWORK INDEV"
+local mnp_ver="2.37 REWORK INDEV"
 local mncp_ver="2.3 REWORK INDEV"
 local forbidden_vers={}
 forbidden_vers["mnp"]={"2.21 EXPERIMENTAL"}
@@ -336,85 +336,7 @@ function mnp.search(to_ip,searchTime)
   log("Search failed: timeout",1)
   return false
 end
-function mnp.dnslookup(hostname,searchTime) --fix: check si
-  -- if not mnp.isConnected() then return false end
-  -- if not hostname then return false end
-  -- if not searchTime then searchTime=300 end
-  -- local timerName="mdl"..computer.uptime()
-  -- local si=ser.serialize(session.newSession("broadcast"))
-  -- data={}
-  -- data[1]=hostname
-  -- modem.send(os.getenv("node_uuid"),ports["dns_lookup"],"dnslookup",si,data)
-  -- log("Stated dns_lookup...")
-  -- local start_time=computer.uptime()
-  -- thread.create(timer,searchTime,timerName):detach()
-  -- while true do
-  --   local id,name,from,port,_,mtype,rsi,data=event.pullMultiple(1,"modem","interrupted","timeout")
-  --   if id=="interrupted" then
-  --     break
-  --   elseif id=="timeout" and name==timerName then
-  --     break
-  --   else
-  --     if port==ports["dns_lookup"] and from==os.getenv("n_uuid") and mtype=="dnslookup" then
-  --       rsi=ser.unserialize(rsi)
-  --       if not rsi["f"] then
-  --         log("DNS lookup received SessionInfo with f=false/nil - Doing nothing",1)
-  --       else
-  --         statusCode=data[2]
-  --         if statusCode==1 then
-  --           log("Lookup completed, took "..computer.uptime()-start_time)
-  --           mnp.saveDomain(hostname,data[3])--hopefully this works
-  --           mnp.savePattern(data[3],rsi)
-  --         end
-  --       end
-  --     end
-  --   end
-  -- end
-  -- log("DNS Lookup failed: timeout", 1)
-  -- return false
-end
-function mnp.connect(to_ip,attempts,timeout) --client REWRITE
-  -- if not ip.isIPv2(to_ip) then return false end
-  -- local sessionInfo=mnp.getPattern(to_ip)
-  -- if not sessionInfo then return false end
-  -- if not tonumber(attempts) then attempts=2 end
-  -- if not tonumber(timeout) then timeout=5 end
-  -- for att=1,attempts do
-  --   log("Connecting.. attempt: "..att)
-  --   modem.send(os.getenv("node_uuid"),ports["mnp_conn"],"connect",ser.serialize(sessionTemplate))
-  --   local _,_,_,_,_,mtype,sessionInfo,data=event.pull(timeout,"modem")
-  --   if mtype=="connection" and SessionInfo["t"]==os.getenv("this_ip") then --idk
-  --     data=unserialize(data)
-  --     statusCode=data[1]
-  --     if statusCode==0 then --OK
-  --       log("Connection established")
-  --       os.setenv("conn_ip",sessionInfo)
-  --       return true
-  --     elseif statusCode==1 then --Error
-  --       log("Connection returned error code 1",1)
-  --       return false
-  --     elseif statusCode==2 then --Forbidden
-  --       log("Connection forbidden",1)
-  --       return false
-  --     else
-  --       log("Connection returned unknown code",2)
-  --       return false
-  --     end
-  --   else end --timeout/other stuff
-  -- end
-  -- log("Cannot connect",1)
-  -- return false
-end
-function mnp.isConnectedToServer(to_ip) --write
-  if os.getenv("conn_ip")==to_ip then return true end
-  --ping server
-  return false
-end
-function mnp.disconnectFromServer() --write
-  --send discon packet
-  os.setenv("conn_ip",nil)
-end
-function mnp.server_connection(si,data,connectedList) --for server REWRITE
+function mnp.server_connection(si,data,connectedList) --for server REWRITE, DO NOT USE
   if not mnp.isConnected() then return false end
   if not session.checkSession(si) or not data then return false end
   data=ser.unserialize(data)
@@ -442,7 +364,7 @@ function mnp.send(to_ip,mtype,data,do_search)
         route=mnp.getSavedRoute(to_ip)
       else
         log("No route to "..to_ip..", search failed.",1)
-        return 2
+        return 3
       end
     end
   end
@@ -469,19 +391,41 @@ function mnp.receive(from_ip,mtype,timeoutTime,rememberRoute)--REVIEW
     local id,name,from,port,_,rmtype,si,data=event.pullMultiple("modem","timeout")
     if id=="timeout" and name==timerName then
       break
-    else
+    elseif id=="modem_message" then
+      if not si then return nil end
       si=ser.unserialize(si)
-      if session.checkSession(si) and from==os.getenv("node_uuid") and port==ports["mnp_data"] and rmtype==mtype and (si["t"]==from_ip or si["route"][0]==from_ip) then
-        if rememberRoute then
-          if si["r"]==false then --should remember
-            mnp.saveRoute(si["route"][0],session.reverseRoute(si["route"]))
+      if session.checkSession(si) and from==os.getenv("node_uuid") and port==ports["mnp_data"] and rmtype==mtype then
+        if si["t"]==from_ip or si["route"][0]==from_ip or from_ip=="broadcast" then
+          if rememberRoute then
+            if si["r"]==false then --should remember
+              mnp.saveRoute(si["route"][0],session.reverseRoute(si["route"]))
+            end
           end
+          return ser.unserialize(data)
         end
-        return ser.unserialize(data)
       end
     end
   end
   return nil
+end
+function mnp.listen(from_ip,mtype,stopEvent,dataEvent)
+  if not mnp.isConnected() or type(mtype)~="string" or type(stopEvent)~="string" or type(dataEvent)~="string" then return nil end
+  while true do
+    local id,_,from,port,_,rmtype,si,data=event.pullMultiple("modem",stopEvent)
+    if id==stopEvent then
+      break
+    else
+      if si and data then
+        si=ser.unserialize(si)
+        data=ser.unserialize(data)
+        if session.checkSession(si) and from==os.getenv("node_uuid") and port==ports["mnp_data"] and rmtype==mtype and data then
+          if si["t"]==from_ip or si["route"][0]==from_ip or from_ip=="broadcast" then
+            computer.pushSignal(dataEvent,ser.serialize(data),ser.serialize(si))
+          end
+        end
+      end
+    end
+  end
 end
 return mnp
 --require("component").modem.send(os.getenv("node_uuid"),1000,"debug_nips",require("serialization").serialize(require("session").newSession()))

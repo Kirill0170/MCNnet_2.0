@@ -205,3 +205,4 @@ elseif args[1]=="nping" then pingNode(ops["n"],ops["t"])
 elseif args[1]=="connect" then connect(args[2])
 else help() end 
 --idea: networks: just display netnames to connect to
+--todo: clear_routes
