@@ -1,5 +1,6 @@
 --MNP CONNECTION MANAGER for client
-local ver="INDEV 0.51"
+local ver="ALPHA 0.7"
+local filename="/usr/.cm_last_netname"
 local mnp=require("cmnp")
 local term=require("term")
 local shell=require("shell")
@@ -19,6 +20,7 @@ local function help()
   cprint("Usage: cm [action] <options>",0x6699FF)
   cprint("Actions:",0x33CC33)
   print("search         search for networks")
+  print("connect <name> connect to network by name; should have connected to this network previously")
   print("status         current connection status")
   print("disconnect     disconnect from network ")
   print("nping <n> <t>  ping node")
@@ -56,7 +58,6 @@ local function status()
   end
 end
 
-
 local function printDist(str1,str2)
   local color=0xFFFFFF
   if str2<70 then color=0x33CC33
@@ -69,12 +70,24 @@ local function printDist(str1,str2)
   gpu.setForeground(0xFFFFFF)
 end
 
+local function savePrevName(name)
+  local file=io.open(filename,"w")
+  file:write(name)
+  file:close()
+end
+local function loadPrevName()
+  local file=io.open(filename,"r")
+  if not file then return nil end
+  name=file:read("*a")
+  file:close()
+  return name
+end
+
 local function search(s,p)
   if p==true then mnp.toggleLog(true)
   elseif s==true then mnp.toggleLog(false) end
-  log("Searching for networks...")
-  os.setenv("this_ip","0000:0000")
-  local rsi=mnp.networkSearch() --res[netname]={from,dist}
+  print("Searching for networks...")
+  local rsi=mnp.networkSearch(5,true) --res[netname]={from,dist}
   if not next(rsi) then cprint("No networks found",0xFFCC33)
   else
     print("№ | Network name | distance")
@@ -105,8 +118,27 @@ local function search(s,p)
     end
     --connect
     print("Trying to connect to "..choice[selected][2])
+    savePrevName(choice[selected][2])
     mnp.networkConnectByName(choice[selected][1][1],choice[selected][2],1)
   end
+end
+
+local function connect(name)
+  mnp.openPorts()
+  if not name then--check previous name
+    name=loadPrevName()
+    if not name then
+      cprint("You haven't connected before. Use 'cm search' to search for networks",0xFFCC33)
+      return false
+    end
+  end
+  local address=mnp.getSavedNode(name)
+  if not address then 
+    cprint("Saved node addresses not found. Use 'cm search' to search for networks",0xFFCC33)
+    return false end
+  print("Trying to connect to "..name)
+  savePrevName(name)
+  mnp.networkConnectByName(address,name)
 end
 
 local function disconnect()
@@ -129,6 +161,10 @@ local function roundTime(value)
   return math.floor(value*100+0.5)/100
 end
 local function pingNode(n,t)
+  if not mnp.isConnected() then
+    cprint("Not connected.",0xFF0000)
+    return false
+  end
   if n then
     if not tonumber(n) then cprint("--n should be given a number, defaulting to 1.",0xFFCC33) n=1 end
     n=tonumber(n)
@@ -166,4 +202,7 @@ elseif args[1]=="disconnect" then disconnect()
 elseif args[1]=="status" then status()
 elseif args[1]=="search" then search(ops["s"],ops["p"])
 elseif args[1]=="nping" then pingNode(ops["n"],ops["t"])
+elseif args[1]=="connect" then connect(args[2])
 else help() end 
+--idea: networks: just display netnames to connect to
+--todo: clear_routes
