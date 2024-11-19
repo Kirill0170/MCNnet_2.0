@@ -98,6 +98,7 @@ function ssap.serverConnectionManager(filename) --no UAP support
   local dataEvent="ssapListenerData"
   thread.create(cmnp.listen,"broadcast","ssap",stopEvent,dataEvent):detach()
   log("Started SSAP Connection Manager")
+  log("Press space to check current client sessions")
   sessions={}
   while true do
     local id,data,si,key=event.pullMultiple(dataEvent,"interrupted","ssap_stopCM","key_down")
@@ -110,8 +111,8 @@ function ssap.serverConnectionManager(filename) --no UAP support
       computer.pushSignal(stopEvent)
       break
     elseif id=="key_down" then
-      log("Current sessions:")
       if key==57 then
+        log("Current sessions:")
         for to_ip,t in pairs(sessions) do
           log(to_ip.." "..t:status())
         end
@@ -206,6 +207,8 @@ function ssap.clientConnection(server_ip,timeoutTime)--REDO THIS USING DEDICATED
         return 2 end --return to end XD
       local sdata={"input_response",{},{input}}
       cmnp.send(server_ip,"ssap",sdata)
+    elseif rdata[1]=="clear" then
+      term.clear()
     else
       log("Unknown ssap header: "..tostring(rdata[1]),1)
     end
