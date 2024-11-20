@@ -71,7 +71,7 @@ function app.main(to_ip)
   api.clear()
   api.text("SSAP APP TEMPLATE") --text
   api.text("Hello world!",styles["example"]) -- styled text: use styles
-  api.text("test",{},{2,2}) --positioned text: {x,y}
+  api.text("test",styles["reset"],{2,2}) --positioned text: {x,y}
   while true do --main loop(You don't want your application to finish, right?)
     local str=api.input(60,"[Enter string]>")
     api.text(str)

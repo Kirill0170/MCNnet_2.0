@@ -378,7 +378,7 @@ function mnp.sendBack(mtype,si,data)--REVIEW
   if not session.checkSession(si) then return false end
   si["r"]=true
   if not data then data={} end
-  modem.send(si["route"][#si["route"]-1],ports["mnp_data"],mtype,ser.serialize(si),ser.serialize(data))
+  modem.send(os.getenv("node_uuid"),ports["mnp_data"],mtype,ser.serialize(si),ser.serialize(data))
 end
 function mnp.receive(from_ip,mtype,timeoutTime,rememberRoute)--REVIEW
   if not mnp.isConnected() then return nil end
@@ -429,3 +429,4 @@ function mnp.listen(from_ip,mtype,stopEvent,dataEvent)
 end
 return mnp
 --require("component").modem.send(os.getenv("node_uuid"),1000,"debug_nips",require("serialization").serialize(require("session").newSession()))
+--require("component").modem.send(os.getenv("node_uuid"),1002,"debug_data",require("serialization").serialize(require("session").newSession(to_ip,cmnp.getSavedRoute(to_ip))),"data",require("serialization").serialize({"data"}))
