@@ -6,7 +6,7 @@ local component=require("component")
 if not component.isAvailable("modem") then error("[IP INIT]: No modem present") end
 local this_uuid=component.getPrimary("modem")["address"]
 local this_ip=os.getenv("this_ip")
-local ip_ver="2.1 BETA"
+local ip_ver="2.2 BETA"
 local nips={} --nips[<ip>]=<uuid>
 local ip={}
 ----------------------------
@@ -99,7 +99,7 @@ end
 
 function ip.deleteUUID(g_uuid)
   for n_ip,n_uuid in pairs(nips) do
-    if n_uuid==g_uuid then nips[g_ip]=nil end
+    if n_uuid==g_uuid then nips[n_ip]=nil end
   end
 end
 
