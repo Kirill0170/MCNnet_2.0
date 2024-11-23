@@ -1,6 +1,6 @@
 --Node (beta)
-local netname="Internet" --change this: network name
-local searchTime=10 --how much of time for connection
+local node_ver="[beta build5]"
+local configFile="nodeconfig"
 local component=require("component")
 local computer=require("computer")
 local ser=require("serialization")
@@ -14,35 +14,12 @@ local session=require("session")
 local ip=require("ipv2")
 local dns=require("dns")
 
-local function log(text,crit)
-  local res="["..computer.uptime().."]"
-  if crit==0 or not crit then
-    print(res.."[NODE/INFO]"..text)
-  elseif crit==1 then
-    gpu.setForeground(0xFFFF33)
-    print(res.."[NODE/WARN]"..text)
-    gpu.setForeground(0xFFFFFF)
-  elseif crit==2 then
-    gpu.setForeground(0xFF3333)
-    print(res.."[NODE/ERROR]"..text)
-    gpu.setForeground(0xFFFFFF)
-  elseif crit==3 then
-    gpu.setForeground(0xFF3333)
-    print(res.."[NODE/FATAL]"..text)
-    gpu.setForeground(0xFFFFFF)
-    local file=io.open("node_err.log","w")
-    file:write(res..text)
-    file:close()
-    error("Fatal error occured in runtime,see log file")
-  else end
-end
-
 local function connection(from,port,mtype,si,data)
-  if not si then return false end
+  if not si then mnp.log("NODE","No packet info received") return false end
   si=ser.unserialize(si)
   if data then data=ser.unserialize(data) end
   if not session.checkSession(si) then 
-    log("Incorrect session field received",1)
+    mnp.log("NODE","Incorrect packet received",1)
     return false 
   end
   if mtype=="netconnect" then
@@ -56,41 +33,65 @@ local function connection(from,port,mtype,si,data)
   elseif mtype=="dns_lookup" then
     mnp.dnsLookup(from,si,data)
   elseif mtype=="mncp_ping" then
-    mnp.mncp_nodePing(from)
+    mnp.mncp.nodePing(from)
   else --data
     mnp.pass(port,mtype,si,data)
   end
 end
-
 --setup
 os.sleep(0.1)
 print("---------------------------")
-log("Node(beta) Starting - Hello World!")
-log("Checking modem")
-if not modem.isWireless() then log("Modem is recommended to be wireless, bro") end
-if modem.getStrength()<400 then log("Modem strength is recommended to be default 400",1) end
-log("Setting up ipv2...")
-if not ip.set(ip.gnip(),true) then log("Could not set node IP",3) end
-log("Setting up DNS...")
+mnp.log("NODE","Node "..node_ver.." Starting - Hello World!")
+mnp.log("NODE","Reading config")
+local config={}
+if not require("filesystem").exists("/lib/"..configFile..".lua") then 
+  mnp.log("NODE","Couldn't open config file",1)
+  mnp.log("NODE","Continuing with default args: Internet 10 true true true",1)
+  config.netName="Internet"
+  config.searchTime=10
+  config.log=true
+  config.logTTL=true
+  config.clearNIPS=true
+else config=require(configFile)
+end
+
+mnp.log("NODE","Checking modem")
+if not modem.isWireless() then mnp.log("NODE","Modem is recommended to be wireless, bro") end
+if modem.getStrength()<400 then mnp.log("NODE","Modem strength is recommended to be default 400",1) end
+mnp.log("NODE","Setting up ipv2...")
+if not ip.set(ip.gnip(),true) then mnp.log("NODE","Could not set node IP",3) end
+mnp.log("NODE","This node's IPv2 is "..ip.gnip())
+if config.clearNIPS then ip.removeAll() end
+mnp.log("NODE","Setting up DNS...")
 dns.init()
-log("Setting up MNP..")
-if not mnp.openPorts() then log("Could not open ports",3) end
-mnp.setNetworkName(netname)
-log("Connecting to other nodes with "..netname.." name...")
-log("Should take "..searchTime.." seconds, as described in node.lua")
-if not mnp.nodeConnect(searchTime) then log("Could not set connect to other nodes: check if ip is set?",3) end
-log("Starting MNCP")
---thread.create(mnp.mncp.checkService):detach() --uncomment this line when in prod!
+mnp.log("NODE","Setting up MNP..")
+mnp.logVersions()
+if not mnp.openPorts() then mnp.log("NODE","Could not open ports",3) end
+mnp.setNetworkName(config.netName)
+mnp.log("NODE","Connecting to other nodes with "..config.netName.." name...")
+mnp.log("NODE","Should take "..config.searchTime.." seconds, as described in /lib/nodeconfig.lua")
+if not mnp.nodeConnect(config.searchTime) then mnp.log("NODE","Could not set connect to other nodes: check if ip is set?",3) end
+mnp.log("NODE","Starting MNCP")
 --main
-log("Node Online!")
+mnp.log("NODE","Node Online!")
+mnp.log("NODE","Press space for debug.")
+mnp.toggleLogs(config.log,config.logTTL)
 
 while true do
-  local id,_,from,port,dist,mtype,si,data=event.pullMultiple("interrupted","modem")
+  local id,_,from,port,dist,mtype,si,data=event.pullMultiple("interrupted","modem","key_down")
   if id=="interrupted" then
     mnp.closeNode()
     break
-  else
-    thread.create(connection,from,port,mtype,si,data)
+  elseif id=="key_down" and port==57 then
+    mnp.log("NODE","Node registered IPs:")
+    local nips=ip.getAll()
+    for n_ip,_ in pairs(nips) do
+      local node_ip,client_ip=ip.getParts(n_ip)
+      if client_ip=="0000" then mnp.log("NODE","  Node "..n_ip)
+      else mnp.log("NODE","  Client "..n_ip) end
+    end
+  elseif id=="modem_message" then
+    thread.create(connection,from,port,mtype,si,data):detach()
   end
 end
-log("Program exited")
+mnp.log("NODE","Program exited")
