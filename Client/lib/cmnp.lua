@@ -1,7 +1,6 @@
---Mcn-net Networking Protocol for Client v2.1 EXPERIMENTAL
+--Mcn-net Networking Protocol for Client BETA
 --Modem is required.
-local dolog=false --log
-local networkSaveFileName="/usr/.mnpSavedNetworks.sb"-- array[netname]=<uuid-address>
+local dolog=false --mnp.log("MNP",local networkSaveFileName="/usr/.mnpSavedNetworks.sb"-- array[netname]=<uuid-address>
 local routeSaveFileName="/usr/.mnpSavedRoutes.sb" --array[to_ip]=<route>
 local component=require("component")
 local computer=require("computer")
@@ -12,8 +11,8 @@ local thread=require("thread")
 local event=require("event")
 local ip=require("ipv2")
 local gpu=component.gpu
-local mnp_ver="2.37 REWORK INDEV"
-local mncp_ver="2.3 REWORK INDEV"
+local mnp_ver="2.4.1 BETA"
+local mncp_ver="2.3.2 REWORK INDEV"
 local forbidden_vers={}
 forbidden_vers["mnp"]={"2.21 EXPERIMENTAL"}
 forbidden_vers["mncp"]={"2.1 EXPERIMENTAL"}
@@ -29,23 +28,50 @@ ports["mftp_data"]=1007
 ports["mftp_srvc"]=1008
 ports["dns_lookup"]=1009
 local mnp={}
+mnp.mncp={}
+function mnp.log(mod,text, crit)
+	if not mod then mod="MNP" end
+	if not text then text="Unknown" end
+	local res = "[" .. computer.uptime() .. "]"
+	if dolog and (crit == 0 or not crit) then
+		print(res .. "["..mod.."/INFO]" .. text)
+	elseif dolog and crit == 1 then
+		gpu.setForeground(0xFFFF33)
+		print(res .. "["..mod.."/WARN]" .. text)
+		gpu.setForeground(0xFFFFFF)
+	elseif crit == 2 then
+		gpu.setForeground(0xFF3333)
+		print(res .. "["..mod.."/ERROR]" .. text)
+		gpu.setForeground(0xFFFFFF)
+	elseif crit == 3 then
+		gpu.setForeground(0xFF3333)
+		print(res .. "["..mod.."/FATAL]" .. text)
+		gpu.setForeground(0xFFFFFF)
+		local file = io.open("mnp_err.log", "w")
+		file:write(res .. text)
+		file:close()
+		error("Fatal error occured in runtime,see mnp_err.log file")
+	else
+	end
+end
 --init-----------------------------------
-if dolog then
-  print("[MNP INIT]: Starting...")
-  print("[MNP INIT]: MNP version "..mnp_ver)
-  print("[MNP INIT]: MNCP version "..mncp_ver)
-  print("[MNP INIT]: SP version "..session.ver())
-  print("[MNP INIT]: IP version "..ip.ver())
-  print("[MNP INIT]: Done")
+function mnp.logVersions() 
+	mnp.log("MNP","Starting...")
+	mnp.log("MNP","MNP version " .. mnp_ver)
+	mnp.log("MNP","MNCP version " .. mncp_ver)
+	mnp.log("MNP","SP version " .. session.ver())
+	mnp.log("MNP","IP version " .. ip.ver())
+	mnp.log("MNP","DNS version " .. dns.ver())
+	mnp.log("MNP","Done")
 end
 local function timer(time,name)
   os.sleep(time)
   computer.pushSignal("timeout",name)
 end
 --MNCP-----------------------------------
-function mnp.mncp_CliService() --REDO
+function mnp.mncp.CliService() --REDO
   if not modem.isOpen(ports["mncp_srvc"]) then modem.open(ports["mncp_srvc"]) end
-  log("Started MNCP service")
+  mnp.log("MNP","Started MNCP service")
   while true do
     local id,_,from,port,_,mtype,si=event.pullMultiple("modem","mncp_cliSrvc_stop")
     if id=="mncp_cliSrvc_stop" then break end
@@ -57,7 +83,7 @@ function mnp.mncp_CliService() --REDO
     end
   end
 end
-function mnp.mncp_nodePing(timeoutTime)
+function mnp.mncp.nodePing(timeoutTime)
   if not modem.isOpen(ports["mncp_ping"]) then modem.open(ports["mncp_ping"]) end
   if not ip.isUUID(os.getenv("node_uuid")) or not ip.isIPv2(os.getenv("this_ip")) then
     return nil
@@ -85,39 +111,14 @@ function mnp.mncp_nodePing(timeoutTime)
   elseif end_time~=0 then return tonumber(end_time)-tonumber(start_time)
   else return nil end --fail??
 end
-function mnp.mncp_c2cPing(to_ip)
+function mnp.mncp.c2cPing(to_ip)
   --write
 end
 --MNP------------------------------------
 --Util-
-function log(text,crit)
-  local res="["..computer.uptime().."]"
-  if dolog and crit==0 or not crit then
-    print(res.."[MNP/INFO]"..text)
-  elseif dolog and crit==1 then
-    gpu.setForeground(0xFFCC33)
-    print(res.."[MNP/WARN]"..text)
-    gpu.setForeground(0xFFFFFF)
-  elseif crit==2 then
-    gpu.setForeground(0xFF3333)
-    print(res.."[MNP/ERROR]"..text)
-    gpu.setForeground(0xFFFFFF)
-  elseif crit==3 then
-    gpu.setForeground(0xFF3333)
-    print(res.."[MNP/FATAL]"..text)
-    gpu.setForeground(0xFFFFFF)
-    local file=io.open("mnp_err.log","w")
-    file:write(res..text)
-    file:close()
-    error("Fatal error occured in runtime,see log file")
-  else end
-end
-function mnp.crash(reason) --do not use
-  --rewrite
-end
 function mnp.openPorts(plog)
   for name,port in pairs(ports) do
-    if plog then log("Opening "..name) end
+    if plog then mnp.log("MNP","Opening "..name) end
     if not modem.open(port) and not modem.isOpen(port) then return false end
   end
   return true
@@ -227,7 +228,7 @@ function mnp.networkSearch(searchTime,save)
     elseif id=="timeout" and name==timerName then break
     else
       if port==ports["mnp_reg"] then
-        if not session.checkSession(ser.unserialize(si)) then log("Invalid session on netsearch")
+        if not session.checkSession(ser.unserialize(si)) then mnp.log("MNP","Invalid session on netsearch")
         else
           data=ser.unserialize(data)
           if data[1]~=nil then --netname found
@@ -252,27 +253,27 @@ function mnp.networkConnectByName(from,name)
   while true do
     local _,this,rfrom,port,_,mtype,si,data=event.pull(5,"modem")
     if not rfrom then
-      log("Node timeouted")
+      mnp.log("MNP","Node timeouted")
       return false
     elseif port~=ports["mnp_reg"] or rfrom~=from then
     else
       data=ser.unserialize(data)
       if name==data[1] then
-        log("Connected to "..name)
+        mnp.log("MNP","Connected to "..name)
         if not ip.isIPv2(data[2]) then 
-          log("incorrect IP received: aborted")
+          mnp.log("MNP","incorrect IP received: aborted")
           return false
         end
         if not ip.set(data[2]) then
-          log("Couldn't set IP, please debug!")
+          mnp.log("MNP","Couldn't set IP, please debug!")
           return false
         else
-          log("IP is set")
+          mnp.log("MNP","IP is set")
           os.setenv("node_uuid",from)
           return true
         end
       else
-        log("Unexpected network name received")
+        mnp.log("MNP","Unexpected network name received")
         return false
       end
     end
@@ -305,7 +306,7 @@ function mnp.search(to_ip,searchTime)
   local timerName="mnpsrch"..computer.uptime()
   local si=session.newSession(to_ip)
   mnp.openPorts()
-  log("Started search for "..to_ip)
+  mnp.log("MNP","Started search for "..to_ip)
   modem.send(os.getenv("node_uuid"),ports["mnp_srch"],"search",ser.serialize(si))
   local start_time=computer.uptime()
   thread.create(timer,searchTime,timerName):detach()
@@ -322,10 +323,10 @@ function mnp.search(to_ip,searchTime)
           return true
         else --error
           if rsi["route"][#rsi["route"]]~="to_ip" then --traceback
-            log("Search failed: incorrect final ip",1)
-            log("Route stack:",1)
+            mnp.log("MNP","Search failed: incorrect final ip",1)
+            mnp.log("MNP","Route stack:",1)
             for i in pairs(rsi["route"]) do
-              log("<route:"..tostring(i)..">:"..rsi["route"][i],1)
+              mnp.log("MNP","<route:"..tostring(i)..">:"..rsi["route"][i],1)
             end
             return false
           end
@@ -333,7 +334,7 @@ function mnp.search(to_ip,searchTime)
       end
     end
   end
-  log("Search failed: timeout",1)
+  mnp.log("MNP","Search failed: timeout",1)
   return false
 end
 function mnp.server_connection(si,data,connectedList) --for server REWRITE, DO NOT USE
@@ -357,13 +358,13 @@ function mnp.send(to_ip,mtype,data,do_search)
   local route=mnp.getSavedRoute(to_ip)
   if not route then
     if not do_search then
-      log("No route to "..to_ip,1)
+      mnp.log("MNP","No route to "..to_ip,1)
       return 2
     else
       if mnp.search(to_ip) then
         route=mnp.getSavedRoute(to_ip)
       else
-        log("No route to "..to_ip..", search failed.",1)
+        mnp.log("MNP","No route to "..to_ip..", search failed.",1)
         return 3
       end
     end

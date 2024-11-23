@@ -1,4 +1,4 @@
-local version="1.3 indev rework"
+local version="1.3.2 alpha"
 local dolog=true
 local component=require("component")
 local computer=require("computer")
@@ -13,31 +13,8 @@ ports["ssap_conn"]=2000
 ports["ssap_data"]=2001
 local ssap={}
 --Util-
-function log(text,crit)
-  local res="["..computer.uptime().."]"
-  if dolog and crit==0 or not crit then
-    print(res.."[SSAP/INFO]"..text)
-  elseif dolog and crit==1 then
-    gpu.setForeground(0xFFFF33)
-    print(res.."[SSAP/WARN]"..text)
-    gpu.setForeground(0xFFFFFF)
-  elseif crit==2 then
-    gpu.setForeground(0xFF3333)
-    print(res.."[SSAP/ERROR]"..text)
-    gpu.setForeground(0xFFFFFF)
-  elseif crit==3 then
-    gpu.setForeground(0xFF3333)
-    print(res.."[SSAP/FATAL]"..text)
-    gpu.setForeground(0xFFFFFF)
-    local file=io.open("mnp_err.log","w")
-    file:write(res..text)
-    file:close()
-    error("Fatal error occured in runtime,see log file")
-  else end
-end
-function timer(time,name)
-  os.sleep(time)
-  computer.pushSignal("timeout",name)
+function ssap.log(text,crit)
+  cmnp.log("SSAP",text,crit)
 end
 function ssap.getVersion() return version end
 --Main--
@@ -56,19 +33,19 @@ function ssap.clientConnect(to_ip,timeoutTime)--REDO AND FIX ISSUES
   local success=cmnp.send(to_ip,"ssap",data)
   if success~=0 then
     if success==1 then
-      log("Not connected",1)
+      ssap.log("Not connected",1)
     elseif success==3 then
-      log("Couldn't find host",1)
+      ssap.log("Couldn't find host",1)
     end
     return false
   end
   local rdata=cmnp.receive(to_ip,"ssap",timeoutTime)
   if not rdata then
-    log("Could not connect to server: timeout",1)
+    ssap.log("Could not connect to server: timeout",1)
     return false
   elseif not ssap.checkData(rdata) then
-    log("Invalid packet received!",1)
-    log("debug: "..ser.serialize(rdata),1)
+    ssap.log("Invalid packet received!",1)
+    ssap.log("debug: "..ser.serialize(rdata),1)
     return false
   end
   if rdata[1]=="init" then
@@ -79,42 +56,42 @@ function ssap.clientConnect(to_ip,timeoutTime)--REDO AND FIX ISSUES
       cmnp.send(to_ip,"ssap",{"start"})--start
       return true
     elseif rdata[3][1]=="CR" then
-      log("Connection refused",1)
+      ssap.log("Connection refused",1)
       return false
     end
   end
-  log("Could not connect to server: wrong packet!",1)
+  ssap.log("Could not connect to server: wrong packet!",1)
   return false
 end
 function ssap.serverConnectionManager(filename) --no UAP support
   local fs=require("filesystem")
   if not fs.exists("/lib/"..filename..".lua") then
-    log("Couldn't start SSAP CM: no such file: "..filename,2)
+    ssap.log("Couldn't start SSAP CM: no such file: "..filename,2)
     return false
   end
-  if not cmnp.isConnected() then log("Couldn't start SSAP CM: not connected",2) return false end
+  if not cmnp.isConnected() then ssap.log("Couldn't start SSAP CM: not connected",2) return false end
   --listener
   local stopEvent="ssapListenerStop"
   local dataEvent="ssapListenerData"
   thread.create(cmnp.listen,"broadcast","ssap",stopEvent,dataEvent):detach()
-  log("Started SSAP Connection Manager")
-  log("Press space to check current client sessions")
+  ssap.log("Started SSAP Connection Manager")
+  ssap.log("Press space to check current client sessions")
   sessions={}
   while true do
     local id,data,si,key=event.pullMultiple(dataEvent,"interrupted","ssap_stopCM","key_down")
     if id=="interrupted" then
-      log("CM interrupted",2)
+      ssap.log("CM interrupted",2)
       computer.pushSignal(stopEvent)
       break 
     elseif id=="ssap_stopCM" then
-      log("Stopping Connection Manager")
+      ssap.log("Stopping Connection Manager")
       computer.pushSignal(stopEvent)
       break
     elseif id=="key_down" then
       if key==57 then
-        log("Current sessions:")
+        ssap.log("Current sessions:")
         for to_ip,t in pairs(sessions) do
-          log(to_ip.." "..t:status())
+          ssap.log(to_ip.." "..t:status())
         end
       end
     else
@@ -131,7 +108,7 @@ function ssap.serverConnectionManager(filename) --no UAP support
           cmnp.sendBack("ssap",si,rdata)
           --wait for client start
           local check_data=cmnp.receive(to_ip,"ssap",10)
-          if not check_data or check_data[1]~="start" then log("Client didn't start app",1)
+          if not check_data or check_data[1]~="start" then ssap.log("Client didn't start app",1)
           else
             --check if already started thread
             if sessions[to_ip] then sessions[to_ip]:kill() end
@@ -148,10 +125,10 @@ function ssap.serverConnectionManager(filename) --no UAP support
 end
 function ssap.application(filepath,to_ip)
   if not require("filesystem").exists("/lib/"..filepath..".lua") then
-    log("Could not open application file",3)
+    ssap.log("Could not open application file",3)
   end
   local app=require(filepath)
-  log("Starting SSAP application...")
+  ssap.log("Starting SSAP application...")
   app.main(to_ip)
 end
 function ssap.send(to_ip,data)
@@ -182,11 +159,11 @@ function ssap.clientConnection(server_ip,timeoutTime)--REDO THIS USING DEDICATED
   while true do
     local rdata=cmnp.receive(server_ip,"ssap",timeoutTime)
     if not rdata then--disconnect
-      log("Disconnected: Server timeouted",1)
+      ssap.log("Disconnected: Server timeouted",1)
       return 1
     end
     if rdata[1]=="exit" then
-      log("Disconnected: exit")
+      ssap.log("Disconnected: exit")
       return 0
     elseif rdata[1]=="text" then
       if rdata[2]["bg_color"] then gpu.setBackground(tonumber(rdata[2]["bg_color"])) end
@@ -203,14 +180,14 @@ function ssap.clientConnection(server_ip,timeoutTime)--REDO THIS USING DEDICATED
       local time=computer.uptime()
       local input=io.read()
       if computer.uptime()-time>tonumber(rdata[2]["timeout"]) then --check if timeouted
-        log("Disconnected: Client timeout",1)
+        ssap.log("Disconnected: Client timeout",1)
         return 2 end --return to end XD
       local sdata={"input_response",{},{input}}
       cmnp.send(server_ip,"ssap",sdata)
     elseif rdata[1]=="clear" then
       term.clear()
     else
-      log("Unknown ssap header: "..tostring(rdata[1]),1)
+      ssap.log("Unknown ssap header: "..tostring(rdata[1]),1)
     end
   end
 end
