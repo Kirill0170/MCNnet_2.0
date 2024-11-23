@@ -1,5 +1,5 @@
 --MNP CONNECTION MANAGER for client
-local ver="ALPHA 0.7"
+local ver="ALPHA 0.7.2"
 local filename="/usr/.cm_last_netname"
 local mnp=require("cmnp")
 local term=require("term")
@@ -179,13 +179,13 @@ local function pingNode(n,t)
   end
   print("Pinging node "..string.sub(os.getenv("node_uuid"),1,4)..":0000")
   if n==1 then
-    local time=mnp.mncp_nodePing(tonumber(t))
+    local time=mnp.mncp.nodePing(tonumber(t))
     if not time then print("Ping timeout.")
     else print("Ping: "..time.."s") end
   else
     times={}
     for i=1,n do
-      local time=mnp.mncp_nodePing(tonumber(t))
+      local time=mnp.mncp.nodePing(tonumber(t))
       if not time then print(i..")Ping timeout.") times[i]=0
       else time=roundTime(time) print(i..")Ping: "..time.."s") times[i]=time end
     end
