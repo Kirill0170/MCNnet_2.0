@@ -13,8 +13,8 @@ local event = require("event")
 local ip = require("ipv2")
 local dns = require("dns")
 local gpu = component.gpu
-local mnp_ver = "2.35 REWORK INDEV"
-local mncp_ver = "2.3 REWORK INDEV"
+local mnp_ver = "2.4.2 BETA"
+local mncp_ver = "2.3.2 REWORK INDEV"
 local forbidden_vers = {}
 forbidden_vers["mnp"] = { "2.21 EXPERIMENTAL" }
 forbidden_vers["mncp"] = { "2.1 EXPERIMENTAL" }
@@ -30,66 +30,72 @@ ports["mftp_data"] = 1007
 ports["mftp_srvc"] = 1008
 ports["dns_lookup"] = 1009
 local mnp = {}
+mnp.mncp={}
 mnp.networkName = "default" --default network name
---init-----------------------------------
-print("[MNP INIT]: Starting...")
-print("[MNP INIT]: MNP version " .. mnp_ver)
-print("[MNP INIT]: MNCP version " .. mncp_ver)
-print("[MNP INIT]: SP version " .. session.ver())
-print("[MNP INIT]: IP version " .. ip.ver())
-print("[MNP INIT]: DNS version " .. dns.ver())
-print("[MNP INIT]: Done")
---MNCP-----------------------------------
-function mnp.mncp_checkService() --rewrite with timer
-	--rewrite
-end
-function mnp.mncp_nodePing(from)
-	modem.send(from, ports["mncp_ping"], "mncp_ping", ser.serialize(session.newSession()))
-end
-function mnp.mncp_c2cPing(to_ip)
-	--write
-end
---MNP------------------------------------
---Util-
-function log(text, crit)
+function mnp.log(mod,text, crit)
+	if not mod then mod="MNP" end
+	if not text then text="Unknown" end
 	local res = "[" .. computer.uptime() .. "]"
-	if dolog and crit == 0 or not crit then
-		print(res .. "[MNP/INFO]" .. text)
+	if dolog and (crit == 0 or not crit) then
+		print(res .. "["..mod.."/INFO]" .. text)
 	elseif dolog and crit == 1 then
 		gpu.setForeground(0xFFFF33)
-		print(res .. "[MNP/WARN]" .. text)
+		print(res .. "["..mod.."/WARN]" .. text)
 		gpu.setForeground(0xFFFFFF)
 	elseif crit == 2 then
 		gpu.setForeground(0xFF3333)
-		print(res .. "[MNP/ERROR]" .. text)
+		print(res .. "["..mod.."/ERROR]" .. text)
 		gpu.setForeground(0xFFFFFF)
 	elseif crit == 3 then
 		gpu.setForeground(0xFF3333)
-		print(res .. "[MNP/FATAL]" .. text)
+		print(res .. "["..mod.."/FATAL]" .. text)
 		gpu.setForeground(0xFFFFFF)
 		local file = io.open("mnp_err.log", "w")
 		file:write(res .. text)
 		file:close()
-		error("Fatal error occured in runtime,see log file")
+		error("Fatal error occured in runtime,see mnp_err.log file")
 	else
 	end
 end
+--init-----------------------------------
+function mnp.logVersions() 
+	mnp.log("MNP","Starting...")
+	mnp.log("MNP","MNP version " .. mnp_ver)
+	mnp.log("MNP","MNCP version " .. mncp_ver)
+	mnp.log("MNP","SP version " .. session.ver())
+	mnp.log("MNP","IP version " .. ip.ver())
+	mnp.log("MNP","DNS version " .. dns.ver())
+	mnp.log("MNP","Done")
+end
+--MNCP-----------------------------------
+function mnp.mncp.checkService() --rewrite with timer
+	--rewrite
+end
+function mnp.mncp.nodePing(from)
+	modem.send(from, ports["mncp_ping"], "mncp_ping", ser.serialize(session.newSession()))
+end
+function mnp.mncp.c2cPing(to_ip)
+	--write
+end
+--MNP------------------------------------
+--Util-
 function timer(time, name)
 	os.sleep(time)
 	computer.pushSignal("timeout", name)
-end
-function mnp.crash(reason) --do not use
-	--rewrite
 end
 function mnp.setNetworkName(newname)
 	if tostring(newname) then
 		mnp.networkName = tostring(newname)
 	end
 end
+function mnp.toggleLogs(tLog,tTTL)
+	if type(tLog)=="boolean" then dolog =tLog end
+	if type(tTTL)=="boolean" then ttllog=tTTL end
+end
 function mnp.openPorts(plog)
 	for name, port in pairs(ports) do
 		if plog then
-			log("Opening " .. name)
+			mnp.log("MNP","Opening " .. name)
 		end
 		if not modem.open(port) and not modem.isOpen(port) then
 			return false
@@ -101,20 +107,21 @@ function mnp.getPort(keyword)
 	return ports[keyword]
 end
 --Main-
-function mnp.closeNode() --!review!
-	log("Closing node, disconnecting everyone...")
+function mnp.closeNode()
+	mnp.log("MNP","Closing node, disconnecting everyone...")
 	local nips = ip.getAll()
 	for n_ip, n_uuid in pairs(nips) do
-		local si = ser.serialize(session.newSession(n_ip, 1))
+		local si = ser.serialize(session.newSession(n_ip))
 		modem.send(n_uuid, ports["mnp_reg"], "netdisconnect", si, ser.serialize({ mnp.networkName }))
 	end
 end
-function mnp.networkDisconnect(from) --!review!
-	ip.deleteUUID(from)
+function mnp.networkDisconnect(from)
+	local deleted_ip=ip.deleteUUID(from)
+	mnp.log("MNP","Disconnected: "..tostring(deleted_ip))
 end
 function mnp.networkSearch(from, si, data) --allows finding
 	if not ip.isUUID(from) or not session.checkSession(si) then
-		log("Invalid si or no from address")
+		mnp.log("MNP","Invalid si or no from address")
 	end
 	--check
 	local respond = true
@@ -130,7 +137,7 @@ function mnp.networkSearch(from, si, data) --allows finding
 end
 function mnp.networkConnect(from, si, data)
 	if not ip.isUUID(from) or not session.checkSession(si) then
-		log("Invalid si or no from address")
+		mnp.log("MNP","Invalid si or no from address")
 		return false
 	end
 	if data then
@@ -143,6 +150,7 @@ function mnp.networkConnect(from, si, data)
 		local ipstr = string.sub(os.getenv("this_ip"), 1, 4) .. ":" .. string.sub(from, 1, 4)
 		modem.send(from, ports["mnp_reg"], "netconnect", rsi, ser.serialize({ mnp.networkName, ipstr }))
 		ip.addUUID(from)
+		mnp.log("MNP","New client connected: "..ipstr)
 		return true
 	elseif ip.isIPv2(si["route"][0], true) then --node
 		if ip.findIP(from) then
@@ -157,10 +165,10 @@ function mnp.networkConnect(from, si, data)
 		local rsi = ser.serialize(session.newSession())
 		modem.send(from, ports["mnp_reg"], "netconnect", rsi, ser.serialize({ "ok" }))
 		ip.addUUID(from, true)
-		log("registered new node")
+		mnp.log("MNP","New node connected: "..si["route"][0])
 		return true
 	else
-		log("unknown ip?")
+		mnp.log("MNP","unknown ip, possibly un-disconnected client",1)
 		return false
 	end
 end
@@ -182,22 +190,21 @@ function mnp.nodeConnect(connectTime) --on node start, call this
 		local id, name, from, port, dist, mtype, si = event.pullMultiple("interrupted", "timeout", "modem")
 		if id == "timeout" or id == "interrupted" then
 			exit = true
-			log("timeout")
+			mnp.log("MNP","timeout")
 		else
 			si = ser.unserialize(si)
 			if ip.isIPv2(si["route"][0], true) then
 				table.insert(found, si["route"][0])
 				ip.addUUID(from, true)
-				log("registered new node")
+				mnp.log("MNP","registered new node")
 			end
 		end
 	end
-	log("debug:exit")
 	return true
 end
-function mnp.search(from, si) --REWRITE: SESSION HAS NO C
+function mnp.search(from, si)
 	if not ip.isUUID(from) or not session.checkSession(si) then
-		log("Unvalid arguments for search", 2)
+		mnp.log("MNP","Unvalid arguments for search", 2)
 		return false
 	end
 	if si["ttl"] <= 1 then
@@ -213,10 +220,10 @@ function mnp.search(from, si) --REWRITE: SESSION HAS NO C
 		end
 		local to_uuid = ip.findUUID(si["route"][to_i])
 		if not to_uuid then
-			log("Couldn't find address to return to while returning search", 2)
+			mnp.log("MNP","Couldn't find address to return to while returning search", 2)
 			return false
 		end
-		--SAVE
+		--SAVE[TODO]
 
 		modem.send(to_uuid, ports["mnp_srch"], "search", ser.serialize(si))
 	else
@@ -235,12 +242,14 @@ function mnp.search(from, si) --REWRITE: SESSION HAS NO C
 				return true
 			end
 		end
-		--CHECK SAVED
+		--CHECK SAVED[TODO]
 
 		--check if looped
-		-- for i=0,#si["route"] do
-		--   if si["route"][i]==ip.gnip() then return false end
-		-- end
+		local chk=0
+		for i=0,#si["route"] do
+		  if si["route"][i]==ip.gnip() then chk=chk+1 end
+		end
+		if chk>1 then return false end
 		--continue search
 		for n_ip, n_uuid in pairs(ip.getNodes(from)) do
 			local ssi = si
@@ -254,29 +263,30 @@ function mnp.pass(port, mtype, si, data)
 	if not port or not mtype or not si then
 		return false
 	end
-	local num = 0
-	for n, v in pairs(si["route"]) do
-		if v == os.getenv("this_ip") then
-			num = n
-			break
+	--check TTL
+	si["ttl"]=si["ttl"]-1
+	if si["ttl"]==0 then
+		if ttllog then
+			mnp.log("MNP","Packet"..si["uuid"].." dropped: TTL = 0",1)
 		end
+		return false
 	end
-	local to
-	if si["r"] == true then
-		to = ip.findUUID(si["route"][tonumber(num - 1)])
-	else
-		to = ip.findUUID(si["route"][tonumber(num + 1)])
-	end
+
+	if si["r"] == true then si["c"]=si["c"]-1
+	else si["c"]=si["c"]+1 end
+
+	local to = ip.findUUID(si["route"][tonumber(num)])
 	if not to then
-		log("Unsuccessful pass: Unknown IP", 2)
-		log("Route crude:" .. ser.serialize(si["route"]), 1)
-		log("Route stack:", 1)
+		mnp.log("MNP","Unsuccessful pass: Unknown IP", 2)
+		mnp.log("MNP","Route crude:" .. ser.serialize(si["route"]), 1)
+		mnp.log("MNP","Route stack:", 1)
 		for i in pairs(si["route"]) do
-			log("<route:" .. tostring(i) .. ">:" .. si["route"][i], 1)
+			mnp.log("MNP","<route:" .. tostring(i) .. ">:" .. si["route"][i], 1)
 		end
-	else
-		modem.send(to, ports["mnp_data"], mtype, ser.serialize(si), ser.serialize(data))
+		mnp.log("MNP","Tried: "..tostring(num))
+		return false
 	end
+	modem.send(to, ports["mnp_data"], mtype, ser.serialize(si), ser.serialize(data))
 	return true
 end
 -------
