@@ -1,11 +1,11 @@
 local ip=require("ipv2")
 local computer=require("computer")
-local version="1.8 BETA"
+local version="1.9 BETA"
 local session={}
 local dolog=true
 function log(text)
   local res="["..computer.uptime().."]"
-  if dolog then print(res.."[SS/INFO]"..text) end
+  if dolog then print(res.."[NC/INFO]"..text) end
 end
 function session.ver() return version end
 function session.checkRoute(route)
@@ -77,4 +77,4 @@ function session.reverseRoute(route) --r0 - who to add to 0
 	return reversed_route
 end
 return session
---SESSION WILL BE RENAMED TO NPACKET(NetworkPacket, np)
+--SESSION WILL BE RENAMED TO NETPACKET(NetworkPacket, np)
