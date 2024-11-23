@@ -6,8 +6,7 @@ local component=require("component")
 if not component.isAvailable("modem") then error("[IP INIT]: No modem present") end
 local this_uuid=component.getPrimary("modem")["address"]
 local this_ip=os.getenv("this_ip")
-local ip_ver="2.01 BETA"
-print("[IP INIT]: Done")
+local ip_ver="2.1 BETA"
 local nips={} --nips[<ip>]=<uuid>
 local ip={}
 ----------------------------
@@ -115,5 +114,6 @@ function ip.getNodes(except)
 end
 
 function ip.getAll() return nips end
+function ip.removeAll() nips={} end
 
 return ip
