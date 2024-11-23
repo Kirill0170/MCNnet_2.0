@@ -1,6 +1,6 @@
 local ip=require("ipv2")
 local computer=require("computer")
-local version="1.7 EXPERIMENTAL"
+local version="1.8 BETA"
 local session={}
 local dolog=true
 function log(text)
@@ -27,6 +27,16 @@ function session.checkSession(sessionInfo) --log for debug
 		if sessionInfo["t"] then log("invalid destination: "..sessionInfo["t"]) else log("no destination") end
 		return false 
 	end
+	if not sessionInfo["c"] then
+		local num = 0
+		for n, v in pairs(sessionInfo["route"]) do
+			if v == os.getenv("this_ip") then
+				num = n
+				break
+			end
+		end
+		sessionInfo["c"]=num
+	end
 	return true
 end
 function session.newSession(to_ip,route,ttl)
@@ -46,6 +56,7 @@ function session.newSession(to_ip,route,ttl)
 		newSession["route"]={}
 		newSession["route"][0]=from_ip
 	end
+	newSession["c"]=0
 	newSession["ttl"]=tonumber(ttl)
 	return newSession
 end
@@ -66,3 +77,4 @@ function session.reverseRoute(route) --r0 - who to add to 0
 	return reversed_route
 end
 return session
+--SESSION WILL BE RENAMED TO NPACKET(NetworkPacket, np)
