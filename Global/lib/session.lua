@@ -47,7 +47,7 @@ function session.newSession(to_ip,route,ttl)
 		newSession["route"]={}
 		newSession["route"][0]=from_ip
 	end
-	newSession["c"]=0
+	newSession["c"]=1
 	newSession["ttl"]=tonumber(ttl)
 	return newSession
 end

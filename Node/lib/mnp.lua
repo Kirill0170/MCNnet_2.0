@@ -131,7 +131,7 @@ function mnp.networkSearch(from, si, data) --allows finding
 		end
 	end
 	if respond then
-		local rsi = session.newSession("", 1)
+		local rsi = session.newSession()
 		modem.send(from, ports["mnp_reg"], "netsearch", ser.serialize(rsi), ser.serialize({ mnp.networkName }))
 	end
 end
