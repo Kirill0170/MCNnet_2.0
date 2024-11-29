@@ -13,7 +13,7 @@ local event=require("event")
 local ip=require("ipv2")
 local gpu=component.gpu
 local mnp_ver="2.4.3 BETA"
-local mncp_ver="2.3.2 REWORK INDEV"
+local mncp_ver="2.4.1 INDEV"
 local forbidden_vers={}
 forbidden_vers["mnp"]={"2.21 EXPERIMENTAL"}
 forbidden_vers["mncp"]={"2.1 EXPERIMENTAL"}
@@ -70,20 +70,24 @@ local function timer(time,name)
   computer.pushSignal("timeout",name)
 end
 --MNCP-----------------------------------
-function mnp.mncp.CliService() --REDO
+function mnp.mncp.c2cPingService(debug)
   if not modem.isOpen(ports["mncp_srvc"]) then modem.open(ports["mncp_srvc"]) end
-  mnp.log("MNP","Started MNCP service")
+  mnp.log("MNP","Started MNCP c2c ping service")
   while true do
-    local id,_,from,port,_,mtype,np=event.pullMultiple("modem","mncp_cliSrvc_stop")
-    if id=="mncp_cliSrvc_stop" then break end
-    if port==ports["mncp_srvc"] and mtype=="mncp_check" then
-      local np=ser.unserialize(np)
-      np["r"]=~np["r"]
-      local to_ip=np["route"][0]
-      modem.send(from,ports["mncp_srvc"],"mncp_check",ser.serialize(netpacket.newPacket()))
+    local id,_,from,port,_,mtype,np,data=event.pullMultiple("modem","mncp_stop")
+    if id=="mncp_stop" then break end
+    if mtype=="mncp_c2c" and np and data then
+      np=ser.unserialize(np)
+      if netpacket.checkPacket(np) then
+        np["r"]=true
+        np["c"]=np["c"]-1
+        if debug then mnp.log("MCNP","C2C ping "..np["route"][0]) end
+        modem.send(from,ports["mncp_srvc"],"mncp_c2c",ser.serialize(np),data)
+      end
     end
   end
 end
+function mnp.mncp.stopService() computer.pushSignal("mncp_stop") end
 function mnp.mncp.nodePing(timeoutTime)
   if not modem.isOpen(ports["mncp_ping"]) then modem.open(ports["mncp_ping"]) end
   if not ip.isUUID(os.getenv("node_uuid")) or not ip.isIPv2(os.getenv("this_ip")) then
@@ -112,8 +116,37 @@ function mnp.mncp.nodePing(timeoutTime)
   elseif end_time~=0 then return tonumber(end_time)-tonumber(start_time)
   else return nil end --fail??
 end
-function mnp.mncp.c2cPing(to_ip)
-  --write
+function mnp.mncp.c2cPing(to_ip,timeoutTime)
+  if not mnp.isConnected() then return nil end
+  if not modem.isOpen(ports["mncp_srvc"]) then modem.open(ports["mncp_srvc"]) end
+  if not ip.isIPv2(to_ip) then return nil end
+  if not timeoutTime then timeoutTime=10 end
+  local start_time=computer.uptime()
+  local end_time=0
+  local timeout=false
+  local test_data="c2c_ping_data; data-size:32   =)"
+  thread.create(timer,timeoutTime,"c2cping"..start_time):detach()
+  while not timeout do
+    local snp=netpacket.newPacket(to_ip,mnp.getSavedRoute(to_ip))
+    modem.send(os.getenv("node_uuid"),ports["mncp_srvc"],"mncp_c2c",ser.serialize(snp),ser.serialize({test_data}))
+    local id,name,from,port,_,mtype,np,data=event.pullMultiple("timeout","modem_message","interrupted")
+    if id=="interrupted" then timeout=true
+    elseif id=="timeout" and name=="c2cping"..start_time then timeout=true
+    elseif id=="modem_message" then
+      if np and data and from==os.getenv("node_uuid") and mtype=="mncp_c2c" then
+        np=ser.unserialize(np)
+        if netpacket.checkPacket(np) then
+          if ser.unserialize(data)[1]==test_data then
+            end_time=computer.uptime()
+            break
+          end
+        end
+      end
+    end
+  end
+  if timeout then return nil
+  elseif end_time~=0 then return tonumber(end_time)-tonumber(start_time)
+  else return nil end
 end
 --MNP------------------------------------
 --Util-
@@ -370,6 +403,7 @@ function mnp.sendBack(mtype,np,data)--REVIEW
   if not mnp.isConnected() then return false end
   if not netpacket.checkPacket(np) then return false end
   np["r"]=true
+  np["c"]=np["c"]-1
   if not data then data={} end
   modem.send(os.getenv("node_uuid"),ports["mnp_data"],mtype,ser.serialize(np),ser.serialize(data))
 end
