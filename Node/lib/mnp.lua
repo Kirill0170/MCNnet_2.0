@@ -275,11 +275,9 @@ function mnp.pass(port, mtype, np, data)
 		end
 		return false
 	end
-
 	if np["r"] == true then np["c"]=np["c"]-1
 	else np["c"]=np["c"]+1 end
-
-	local to = ip.findUUID(np["route"]["c"])
+	local to = ip.findUUID(np["route"][np["c"]])
 	if not to then
 		mnp.log("MNP","Unsuccessful pass: Unknown IP", 2)
 		mnp.log("MNP","Route crude:" .. ser.serialize(np["route"]), 1)

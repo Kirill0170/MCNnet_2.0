@@ -70,6 +70,8 @@ function ssap.serverConnectionManager(filename) --no UAP support
     return false
   end
   if not cmnp.isConnected() then ssap.log("Couldn't start SSAP CM: not connected",2) return false end
+  --DEBUG
+  cmnp.toggleLog(true)
   --listener
   local stopEvent="ssapListenerStop"
   local dataEvent="ssapListenerData"
