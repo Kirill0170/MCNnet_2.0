@@ -1,7 +1,8 @@
 --MNP CONNECTION MANAGER for client
-local ver="ALPHA 0.7.3"
+local ver="ALPHA 0.9"
 local filename="/usr/.cm_last_netname"
 local mnp=require("cmnp")
+local ip=require("ipv2")
 local term=require("term")
 local shell=require("shell")
 local component=require("component")
@@ -19,11 +20,13 @@ local function help()
   print("Version "..ver)
   cprint("Usage: cm [action] <options>",0x6699FF)
   cprint("Actions:",0x33CC33)
-  print("search         search for networks")
-  print("connect <name> connect to network by name; should have connected to this network previously")
-  print("status         current connection status")
-  print("disconnect     disconnect from network ")
-  print("nping <n> <t>  ping node")
+  print("netsearch               search for networks")
+  print("connect <name>       connect to network by name; should have connected to this network previously")
+  print("                       use 'cm connect' to connect to previous network")
+  print("status               current connection status")
+  print("disconnect           disconnect from network ")
+  print("nping <n> <t>        ping node")
+  print("c2cping <n> <t> [ip] Client-to-Client pinging")
   cprint("Options:",0x33CC33)
   print("-s             Silence logs")
   print("-p             Print logs")
@@ -84,8 +87,6 @@ local function loadPrevName()
 end
 
 local function search(s,p)
-  if p==true then mnp.toggleLog(true)
-  elseif s==true then mnp.toggleLog(false) end
   print("Searching for networks...")
   local rsi=mnp.networkSearch(5,true) --res[netname]={from,dist}
   if not next(rsi) then cprint("No networks found",0xFFCC33)
@@ -139,11 +140,12 @@ local function connect(name)
     return false end
   print("Trying to connect to "..name)
   savePrevName(name)
-  mnp.networkConnectByName(address,name)
+  if mnp.networkConnectByName(address,name) then print("Connected successfully")
+  else print("Couldn't connect") end
 end
 
 local function disconnect()
-  mnp.disconnect()
+  if os.getenv("node_uuid") then mnp.disconnect() end
 end
 
 local function calculateStats(array)
@@ -195,14 +197,62 @@ local function pingNode(n,t)
     print("     max: "..max.."s min: "..min.."s avg: "..avg.."s")
   end
 end
+local function c2cping(n,t,to_ip)
+  if not mnp.isConnected() then
+    cprint("Not connected.",0xFF0000)
+    return false
+  end
+  if n then
+    if not tonumber(n) then cprint("--n should be given a number, defaulting to 1.",0xFFCC33) n=1 end
+    n=tonumber(n)
+  else
+    n=1
+  end
+  if t then
+    if not tonumber(t) then cprint("--t should be given a number, defaulting to 10",0xFFCC33) t=10 end
+    t=tonumber(t)
+  else
+    t=10
+  end
+  if not ip.isIPv2(to_ip) then cprint("IPv2 needed to ping!",0xFF0000) return false end
+  if not mnp.getSavedRoute(to_ip) then
+    cprint("No route to "..to_ip.." found. searching...",0xFFCC33)
+    if not mnp.search(to_ip) then
+      cprint("Failed search",0xFFCC33)
+      return false
+    end
+  end
+  if not mnp.getSavedRoute(to_ip) then cprint("Couldn't get route for "..to_ip,2) return false end
+  print("Client-to-Client pinging "..to_ip)
+  if n==1 then
+    local time=mnp.mncp.c2cPing(to_ip,tonumber(t))
+    if not time then print("c2c ping timeout.")
+    else print("Ping: "..time.."s") end
+  else
+    local times={}
+    for i=1,n do
+      local time=mnp.mncp.c2cPing(to_ip,tonumber(t))
+      if not time then print(i..")c2c ping timeout.") times[i]=0
+      else time=roundTime(time) print(i..")Ping: "..time.."s") times[i]=time end
+    end
+    local max,min,avg=calculateStats(times)
+    print(to_ip.." c2c ping for statistics:")
+    print("     max: "..max.."s min: "..min.."s avg: "..avg.."s")
+  end
+end
 --main
 local args,ops = shell.parse(...)
 if not args and not ops then help()
-elseif ops["h"] or ops["help"] then help()
-elseif args[1]=="disconnect" then disconnect()
+elseif ops["h"] or ops["help"] then help() end
+
+if ops["p"]==true then mnp.toggleLog(true)
+elseif ops["s"]==true then mnp.toggleLog(false) end
+
+if args[1]=="disconnect" then disconnect()
 elseif args[1]=="status" then status()
-elseif args[1]=="search" then search(ops["s"],ops["p"])
+elseif args[1]=="netsearch" then search(ops["s"],ops["p"])
 elseif args[1]=="nping" then pingNode(ops["n"],ops["t"])
+elseif args[1]=="c2cping" then c2cping(ops["n"],ops["t"],args[2])
 elseif args[1]=="connect" then connect(args[2])
 else help() end 
 --idea: networks: just display netnames to connect to
