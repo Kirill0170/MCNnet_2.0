@@ -1,4 +1,4 @@
-local version="1.3.2 alpha"
+local version="1.3.4 alpha"
 local dolog=true
 local component=require("component")
 local computer=require("computer")
@@ -78,7 +78,7 @@ function ssap.serverConnectionManager(filename) --no UAP support
   ssap.log("Press space to check current client sessions")
   sessions={}
   while true do
-    local id,data,si,key=event.pullMultiple(dataEvent,"interrupted","ssap_stopCM","key_down")
+    local id,data,np,key=event.pullMultiple(dataEvent,"interrupted","ssap_stopCM","key_down")
     if id=="interrupted" then
       ssap.log("CM interrupted",2)
       computer.pushSignal(stopEvent)
@@ -96,16 +96,16 @@ function ssap.serverConnectionManager(filename) --no UAP support
       end
     else
       data=ser.unserialize(data)
-      si=ser.unserialize(si)
+      np=ser.unserialize(np)
       if data[1]=="init" then
         rdata={}
         rdata[1]="init"
         rdata[2]={}
         rdata[2]["uap"]=false --UAP
-        local to_ip=si["route"][0]
+        local to_ip=np["route"][0]
         if data[2]["version"]==version then
           rdata[3]={"OK",""}
-          cmnp.sendBack("ssap",si,rdata)
+          cmnp.sendBack("ssap",np,rdata)
           --wait for client start
           local check_data=cmnp.receive(to_ip,"ssap",10)
           if not check_data or check_data[1]~="start" then ssap.log("Client didn't start app",1)
@@ -117,7 +117,7 @@ function ssap.serverConnectionManager(filename) --no UAP support
           end
         else
           rdata[3]={"CR","Different SSAP version!"}
-          cmnp.sendBack("ssap",si,rdata)
+          cmnp.sendBack("ssap",np,rdata)
         end
       end
     end

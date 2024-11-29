@@ -1,5 +1,5 @@
 --Node (beta)
-local node_ver="[beta build5]"
+local node_ver="[beta build6]"
 local configFile="nodeconfig"
 local component=require("component")
 local computer=require("computer")
@@ -10,32 +10,32 @@ local thread=require("thread")
 local event=require("event")
 local gpu=component.gpu
 local mnp=require("mnp")
-local session=require("session")
+local netpacket=require("netpacket")
 local ip=require("ipv2")
 local dns=require("dns")
 
-local function connection(from,port,mtype,si,data)
-  if not si then mnp.log("NODE","No packet info received") return false end
-  si=ser.unserialize(si)
+local function connection(from,port,mtype,np,data)
+  if not np then mnp.log("NODE","No packet info received") return false end
+  np=ser.unserialize(np)
   if data then data=ser.unserialize(data) end
-  if not session.checkSession(si) then 
+  if not netpacket.checkPacket(np) then 
     mnp.log("NODE","Incorrect packet received",1)
     return false 
   end
   if mtype=="netconnect" then
-    mnp.networkConnect(from,si,data)
+    mnp.networkConnect(from,np,data)
   elseif mtype=="netdisconnect" then
     mnp.networkDisconnect(from)
   elseif mtype=="netsearch" then
-    mnp.networkSearch(from,si,data)
+    mnp.networkSearch(from,np,data)
   elseif mtype=="search" then
-    mnp.search(from,si)
+    mnp.search(from,np)
   elseif mtype=="dns_lookup" then
-    mnp.dnsLookup(from,si,data)
+    mnp.dnsLookup(from,np,data)
   elseif mtype=="mncp_ping" then
     mnp.mncp.nodePing(from)
   else --data
-    mnp.pass(port,mtype,si,data)
+    mnp.pass(port,mtype,np,data)
   end
 end
 --setup
@@ -78,7 +78,7 @@ mnp.log("NODE","Press space for debug.")
 mnp.toggleLogs(config.log,config.logTTL)
 
 while true do
-  local id,_,from,port,dist,mtype,si,data=event.pullMultiple("interrupted","modem","key_down")
+  local id,_,from,port,dist,mtype,np,data=event.pullMultiple("interrupted","modem","key_down")
   if id=="interrupted" then
     mnp.closeNode()
     break
@@ -91,7 +91,7 @@ while true do
       else mnp.log("NODE","  Client "..n_ip) end
     end
   elseif id=="modem_message" then
-    thread.create(connection,from,port,mtype,si,data):detach()
+    thread.create(connection,from,port,mtype,np,data):detach()
   end
 end
 mnp.log("NODE","Program exited")

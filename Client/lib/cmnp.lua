@@ -5,13 +5,13 @@ local routeSaveFileName="/usr/.mnpSavedRoutes.sb" --array[to_ip]=<route>
 local component=require("component")
 local computer=require("computer")
 local ser=require("serialization")
-local session=require("session")
+local netpacket = require("netpacket")
 local modem=component.modem
 local thread=require("thread")
 local event=require("event")
 local ip=require("ipv2")
 local gpu=component.gpu
-local mnp_ver="2.4.1 BETA"
+local mnp_ver="2.4.3 BETA"
 local mncp_ver="2.3.2 REWORK INDEV"
 local forbidden_vers={}
 forbidden_vers["mnp"]={"2.21 EXPERIMENTAL"}
@@ -59,7 +59,7 @@ function mnp.logVersions()
 	mnp.log("MNP","Starting...")
 	mnp.log("MNP","MNP version " .. mnp_ver)
 	mnp.log("MNP","MNCP version " .. mncp_ver)
-	mnp.log("MNP","SP version " .. session.ver())
+	mnp.log("MNP","NP version " .. netpacket.ver())
 	mnp.log("MNP","IP version " .. ip.ver())
 	mnp.log("MNP","DNS version " .. dns.ver())
 	mnp.log("MNP","Done")
@@ -73,13 +73,13 @@ function mnp.mncp.CliService() --REDO
   if not modem.isOpen(ports["mncp_srvc"]) then modem.open(ports["mncp_srvc"]) end
   mnp.log("MNP","Started MNCP service")
   while true do
-    local id,_,from,port,_,mtype,si=event.pullMultiple("modem","mncp_cliSrvc_stop")
+    local id,_,from,port,_,mtype,np=event.pullMultiple("modem","mncp_cliSrvc_stop")
     if id=="mncp_cliSrvc_stop" then break end
     if port==ports["mncp_srvc"] and mtype=="mncp_check" then
-      local si=ser.unserialize(si)
-      si["r"]=~si["r"]
-      local to_ip=si["route"][0]
-      modem.send(from,ports["mncp_srvc"],"mncp_check",ser.serialize(session.newSession()))
+      local np=ser.unserialize(np)
+      np["r"]=~np["r"]
+      local to_ip=np["route"][0]
+      modem.send(from,ports["mncp_srvc"],"mncp_check",ser.serialize(netpacket.newPacket()))
     end
   end
 end
@@ -94,8 +94,8 @@ function mnp.mncp.nodePing(timeoutTime)
   local timeout=false
   thread.create(timer,timeoutTime,"ping"..start_time):detach()
   while not timeout do
-    modem.send(os.getenv("node_uuid"),ports["mncp_ping"],"mncp_ping",ser.serialize(session.newSession()))
-    local id,name,from,port,_,mtype,si=event.pullMultiple("timeout","modem_message","interrupted")
+    modem.send(os.getenv("node_uuid"),ports["mncp_ping"],"mncp_ping",ser.serialize(netpacket.newPacket()))
+    local id,name,from,port,_,mtype,np=event.pullMultiple("timeout","modem_message","interrupted")
     if id=="interrupted" then timeout=true
     elseif id=="timeout" and name=="ping"..start_time then timeout=true
     elseif id=="modem_message" then
@@ -124,7 +124,7 @@ function mnp.openPorts(plog)
   return true
 end
 function mnp.toggleLog(change)
-  if change==true or change==false then 
+  if type(change)=="boolean" then 
     dolog=change
     return true
   else return false end
@@ -186,7 +186,7 @@ function mnp.loadRoutes()
   --checks
   if type(savedata)~="table" then return {} end
   for s_ip,route in pairs(savedata) do
-    if ip.isIPv2(s_ip) and session.checkRoute(route) then
+    if ip.isIPv2(s_ip) and netpacket.checkRoute(route) then
       savedata2[s_ip]=route
     end
   end
@@ -199,7 +199,7 @@ function mnp.getSavedRoute(to_ip)
   return saved[to_ip]
 end
 function mnp.saveRoute(to_ip,route)
-  if not session.checkRoute(route) or not ip.isIPv2(to_ip) then return false end
+  if not netpacket.checkRoute(route) or not ip.isIPv2(to_ip) then return false end
   local saved=mnp.loadRoutes()
   saved[to_ip]=route
   local file=io.open(routeSaveFileName,"w")
@@ -222,13 +222,13 @@ function mnp.networkSearch(searchTime,save)
   if not modem.isOpen(ports["mnp_reg"]) then modem.open(ports["mnp_reg"]) end
   thread.create(timer,searchTime,timerName):detach()
   while true do
-    modem.broadcast(ports["mnp_reg"],"netsearch",ser.serialize(session.newSession()),ser.serialize({res}))
-    local id,name,from,port,dist,mtype,si,data=event.pullMultiple("modem","timeout","interrupted")
+    modem.broadcast(ports["mnp_reg"],"netsearch",ser.serialize(netpacket.newPacket()),ser.serialize({res}))
+    local id,name,from,port,dist,mtype,np,data=event.pullMultiple("modem","timeout","interrupted")
     if id=="interrupted" then break
     elseif id=="timeout" and name==timerName then break
     else
       if port==ports["mnp_reg"] then
-        if not session.checkSession(ser.unserialize(si)) then mnp.log("MNP","Invalid session on netsearch")
+        if not netpacket.checkPacket(ser.unserialize(np)) then mnp.log("MNP","Invalid packet on netsearch")
         else
           data=ser.unserialize(data)
           if data[1]~=nil then --netname found
@@ -247,11 +247,11 @@ function mnp.networkConnectByName(from,name)
   if not name then return false end
   os.setenv("this_ip","0000:0000")
   os.setenv("node_uuid",nil)
-  local rsi=ser.serialize(session.newSession(os.getenv("this_ip")))--!!
+  local rnp=netpacket.newPacket(os.getenv("this_ip"))--!!
   local sdata={name}
-  modem.send(from,ports["mnp_reg"],"netconnect",rsi,ser.serialize(sdata))
+  modem.send(from,ports["mnp_reg"],"netconnect",ser.serialize(rnp),ser.serialize(sdata))
   while true do
-    local _,this,rfrom,port,_,mtype,si,data=event.pull(5,"modem")
+    local _,this,rfrom,port,_,mtype,np,data=event.pull(5,"modem")
     if not rfrom then
       mnp.log("MNP","Node timeouted")
       return false
@@ -281,7 +281,7 @@ function mnp.networkConnectByName(from,name)
 end
 
 function mnp.disconnect()
-   modem.send(os.getenv("node_uuid"),ports["mnp_reg"],"netdisconnect",ser.serialize(session.newSession()))
+   modem.send(os.getenv("node_uuid"),ports["mnp_reg"],"netdisconnect",ser.serialize(netpacket.newPacket()))
    os.setenv("node_uuid",nil)
    ip.remove()
 end
@@ -304,29 +304,33 @@ function mnp.search(to_ip,searchTime)
   if not searchTime then searchTime=120 end
   local timerName="ms"..computer.uptime()
   local timerName="mnpsrch"..computer.uptime()
-  local si=session.newSession(to_ip)
+  local np=netpacket.newPacket(to_ip)
   mnp.openPorts()
   mnp.log("MNP","Started search for "..to_ip)
-  modem.send(os.getenv("node_uuid"),ports["mnp_srch"],"search",ser.serialize(si))
+  modem.send(os.getenv("node_uuid"),ports["mnp_srch"],"search",ser.serialize(np))
   local start_time=computer.uptime()
   thread.create(timer,searchTime,timerName):detach()
   while true do
-    local id,name,from,port,_,mtype,rsi=event.pullMultiple(1,"modem","interrupted","timeout")
+    local id,name,from,port,_,mtype,rnp=event.pullMultiple(1,"modem","interrupted","timeout")
     if id=="interrupted" then break
     elseif id=="timeout" then
       if name==timerName then break end
     else
       if from==os.getenv("node_uuid") and port==ports["mnp_srch"] and mtype=="search" then
-        rsi=ser.unserialize(rsi)
-        if rsi["f"]==true and rsi["route"][#rsi["route"]]==to_ip then
-          mnp.saveRoute(to_ip,rsi["route"])
+        rnp=ser.unserialize(rnp)
+        if not netpacket.checkPacket(rnp) then 
+          mnp.log("MNP","Invalid packet when finishing search",2)
+          return false 
+        end
+        if rnp["f"]==true and rnp["route"][#rnp["route"]]==to_ip then
+          mnp.saveRoute(to_ip,rnp["route"])
           return true
         else --error
-          if rsi["route"][#rsi["route"]]~="to_ip" then --traceback
+          if rnp["route"][#rnp["route"]]~="to_ip" then --traceback
             mnp.log("MNP","Search failed: incorrect final ip",1)
             mnp.log("MNP","Route stack:",1)
-            for i in pairs(rsi["route"]) do
-              mnp.log("MNP","<route:"..tostring(i)..">:"..rsi["route"][i],1)
+            for i in pairs(rnp["route"]) do
+              mnp.log("MNP","<route:"..tostring(i)..">:"..rnp["route"][i],1)
             end
             return false
           end
@@ -336,19 +340,6 @@ function mnp.search(to_ip,searchTime)
   end
   mnp.log("MNP","Search failed: timeout",1)
   return false
-end
-function mnp.server_connection(si,data,connectedList) --for server REWRITE, DO NOT USE
-  if not mnp.isConnected() then return false end
-  if not session.checkSession(si) or not data then return false end
-  data=ser.unserialize(data)
-  --banned uuids here
-  for k,v in pairs(connectedList) do
-    if v==si["route"][0] then return false end
-  end
-  table.insert(connectedList,si["route"][0])
-  data={1}
-  si["r"]=true
-  modem.send(si["route"][#si["route"]-1],"connection",ser.serialize(si),ser.serialize(data))
 end
 function mnp.send(to_ip,mtype,data,do_search)
   if not mnp.isConnected() then return 1 end
@@ -369,17 +360,17 @@ function mnp.send(to_ip,mtype,data,do_search)
       end
     end
   end
-  local si=session.newSession(to_ip,route)
+  local np=netpacket.newPacket(to_ip,route)
   to_uuid=os.getenv("node_uuid")
-  modem.send(to_uuid,ports["mnp_data"],mtype,ser.serialize(si),ser.serialize(data))
+  modem.send(to_uuid,ports["mnp_data"],mtype,ser.serialize(np),ser.serialize(data))
   return 0
 end
-function mnp.sendBack(mtype,si,data)--REVIEW
+function mnp.sendBack(mtype,np,data)--REVIEW
   if not mnp.isConnected() then return false end
-  if not session.checkSession(si) then return false end
-  si["r"]=true
+  if not netpacket.checkPacket(np) then return false end
+  np["r"]=true
   if not data then data={} end
-  modem.send(os.getenv("node_uuid"),ports["mnp_data"],mtype,ser.serialize(si),ser.serialize(data))
+  modem.send(os.getenv("node_uuid"),ports["mnp_data"],mtype,ser.serialize(np),ser.serialize(data))
 end
 function mnp.receive(from_ip,mtype,timeoutTime,rememberRoute)--REVIEW
   if not mnp.isConnected() then return nil end
@@ -389,17 +380,17 @@ function mnp.receive(from_ip,mtype,timeoutTime,rememberRoute)--REVIEW
   local timerName="r"..computer.uptime()
   thread.create(timer,timeoutTime,timerName):detach()
   while true do
-    local id,name,from,port,_,rmtype,si,data=event.pullMultiple("modem","timeout")
+    local id,name,from,port,_,rmtype,np,data=event.pullMultiple("modem","timeout")
     if id=="timeout" and name==timerName then
       break
     elseif id=="modem_message" then
-      if not si then return nil end
-      si=ser.unserialize(si)
-      if session.checkSession(si) and from==os.getenv("node_uuid") and port==ports["mnp_data"] and rmtype==mtype then
-        if si["t"]==from_ip or si["route"][0]==from_ip or from_ip=="broadcast" then
+      if not np then return nil end
+    np=ser.unserialize(np)
+      if netpacket.checkPacket(np) and from==os.getenv("node_uuid") and port==ports["mnp_data"] and rmtype==mtype then
+        if np["t"]==from_ip or np["route"][0]==from_ip or from_ip=="broadcast" then
           if rememberRoute then
-            if si["r"]==false then --should remember
-              mnp.saveRoute(si["route"][0],session.reverseRoute(si["route"]))
+            if np["r"]==false then --should remember
+              mnp.saveRoute(np["route"][0],netpacket.reverseRoute(np["route"]))
             end
           end
           return ser.unserialize(data)
@@ -412,16 +403,16 @@ end
 function mnp.listen(from_ip,mtype,stopEvent,dataEvent)
   if not mnp.isConnected() or type(mtype)~="string" or type(stopEvent)~="string" or type(dataEvent)~="string" then return nil end
   while true do
-    local id,_,from,port,_,rmtype,si,data=event.pullMultiple("modem",stopEvent)
+    local id,_,from,port,_,rmtype,np,data=event.pullMultiple("modem",stopEvent)
     if id==stopEvent then
       break
     else
-      if si and data then
-        si=ser.unserialize(si)
+      if np and data then
+        np=ser.unserialize(np)
         data=ser.unserialize(data)
-        if session.checkSession(si) and from==os.getenv("node_uuid") and port==ports["mnp_data"] and rmtype==mtype and data then
-          if si["t"]==from_ip or si["route"][0]==from_ip or from_ip=="broadcast" then
-            computer.pushSignal(dataEvent,ser.serialize(data),ser.serialize(si))
+        if netpacket.checkPacket(np) and from==os.getenv("node_uuid") and port==ports["mnp_data"] and rmtype==mtype and data then
+          if np["t"]==from_ip or np["route"][0]==from_ip or from_ip=="broadcast" then
+            computer.pushSignal(dataEvent,ser.serialize(data),ser.serialize(np))
           end
         end
       end
@@ -429,5 +420,5 @@ function mnp.listen(from_ip,mtype,stopEvent,dataEvent)
   end
 end
 return mnp
---require("component").modem.send(os.getenv("node_uuid"),1000,"debug_nips",require("serialization").serialize(require("session").newSession()))
---require("component").modem.send(os.getenv("node_uuid"),1002,"debug_data",require("serialization").serialize(require("session").newSession(to_ip,cmnp.getSavedRoute(to_ip))),"data",require("serialization").serialize({"data"}))
+--require("component").modem.send(os.getenv("node_uuid"),1000,"debug_nips",require("serialization").serialize(require("netpacket").newPacket()))
+--require("component").modem.send(os.getenv("node_uuid"),1002,"debug_data",require("serialization").serialize(require("netpacket").newPacket(to_ip,cmnp.getSavedRoute(to_ip))),"data",require("serialization").serialize({"data"}))
