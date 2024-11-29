@@ -1,6 +1,7 @@
 --Mcn-net Networking Protocol for Client BETA
 --Modem is required.
-local dolog=false --mnp.log("MNP",local networkSaveFileName="/usr/.mnpSavedNetworks.sb"-- array[netname]=<uuid-address>
+local dolog=false
+local networkSaveFileName="/usr/.mnpSavedNetworks.sb"-- array[netname]=<uuid-address>
 local routeSaveFileName="/usr/.mnpSavedRoutes.sb" --array[to_ip]=<route>
 local component=require("component")
 local computer=require("computer")
@@ -48,6 +49,7 @@ function mnp.log(mod,text, crit)
 		print(res .. "["..mod.."/FATAL]" .. text)
 		gpu.setForeground(0xFFFFFF)
 		local file = io.open("mnp_err.log", "w")
+    if not file then return nil end
 		file:write(res .. text)
 		file:close()
 		error("Fatal error occured in runtime,see mnp_err.log file")
@@ -61,7 +63,6 @@ function mnp.logVersions()
 	mnp.log("MNP","MNCP version " .. mncp_ver)
 	mnp.log("MNP","NP version " .. netpacket.ver())
 	mnp.log("MNP","IP version " .. ip.ver())
-	mnp.log("MNP","DNS version " .. dns.ver())
 	mnp.log("MNP","Done")
 end
 local function timer(time,name)
@@ -139,9 +140,9 @@ function mnp.loadSavedNodes()
     file:close()
     return {}
   end
-  savedata=ser.unserialize(file:read("*a"))
+  local savedata=ser.unserialize(file:read("*a"))
   file:close()
-  savedata2={}
+  local savedata2={}
   --checks
   if type(savedata)~="table" then return {} end
   for netname,n_uuid in pairs(savedata) do
@@ -180,9 +181,9 @@ function mnp.loadRoutes()
     file:close()
     return {}
   end
-  savedata=ser.unserialize(file:read("*a"))
+  local savedata=ser.unserialize(file:read("*a"))
   file:close()
-  savedata2={}
+  local savedata2={}
   --checks
   if type(savedata)~="table" then return {} end
   for s_ip,route in pairs(savedata) do
@@ -361,7 +362,7 @@ function mnp.send(to_ip,mtype,data,do_search)
     end
   end
   local np=netpacket.newPacket(to_ip,route)
-  to_uuid=os.getenv("node_uuid")
+  local to_uuid=os.getenv("node_uuid")
   modem.send(to_uuid,ports["mnp_data"],mtype,ser.serialize(np),ser.serialize(data))
   return 0
 end

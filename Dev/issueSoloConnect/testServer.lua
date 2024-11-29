@@ -6,7 +6,7 @@ local ip2="d34c:148c" --local ips for testing
 
 function serverFunction(ip)
   print("waiting for "..ip)
-  local data=mnp.receive(ip,"test",60)
+  local data=cmnp.receive(ip,"test",60)
   print(data[1])
 end
 

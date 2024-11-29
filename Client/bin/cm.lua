@@ -1,5 +1,5 @@
 --MNP CONNECTION MANAGER for client
-local ver="ALPHA 0.7.2"
+local ver="ALPHA 0.7.3"
 local filename="/usr/.cm_last_netname"
 local mnp=require("cmnp")
 local term=require("term")
@@ -61,8 +61,8 @@ end
 local function printDist(str1,str2)
   local color=0xFFFFFF
   if str2<70 then color=0x33CC33
-  elseif str<200 then color=0xFFFF33
-  elseif str<300 then color=0xFFCC33
+  elseif str2<200 then color=0xFFFF33
+  elseif str2<300 then color=0xFFCC33
   else color=0xFF0000 end
   term.write(str1)
   gpu.setForeground(color)
@@ -78,7 +78,7 @@ end
 local function loadPrevName()
   local file=io.open(filename,"r")
   if not file then return nil end
-  name=file:read("*a")
+  local name=file:read("*a")
   file:close()
   return name
 end
@@ -91,8 +91,8 @@ local function search(s,p)
   if not next(rsi) then cprint("No networks found",0xFFCC33)
   else
     print("№ | Network name | distance")
-    counter=1
-    choice={} --choice[num]={{from,dist},netname}
+    local counter=1
+    local choice={} --choice[num]={{from,dist},netname}
     for name, info in pairs(rsi) do
       printDist(tostring(counter).." | "..name,info[2])
       choice[counter]={rsi[name],name}
@@ -101,6 +101,7 @@ local function search(s,p)
     print("------------------------------")
     print("Select network to connect or 'q' to exit")
     local exit=false
+    local selected=0
     while not exit do
       term.write(">")
       local input=io.read()
@@ -183,13 +184,13 @@ local function pingNode(n,t)
     if not time then print("Ping timeout.")
     else print("Ping: "..time.."s") end
   else
-    times={}
+    local times={}
     for i=1,n do
       local time=mnp.mncp.nodePing(tonumber(t))
       if not time then print(i..")Ping timeout.") times[i]=0
       else time=roundTime(time) print(i..")Ping: "..time.."s") times[i]=time end
     end
-    max,min,avg=calculateStats(times)
+    local max,min,avg=calculateStats(times)
     print("Ping statistics:")
     print("     max: "..max.."s min: "..min.."s avg: "..avg.."s")
   end

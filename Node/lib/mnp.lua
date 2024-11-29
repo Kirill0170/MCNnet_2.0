@@ -13,7 +13,7 @@ local event = require("event")
 local ip = require("ipv2")
 local dns = require("dns")
 local gpu = component.gpu
-local mnp_ver = "2.4.3 BETA"
+local mnp_ver = "2.4.4 BETA"
 local mncp_ver = "2.3.2 REWORK INDEV"
 local forbidden_vers = {}
 forbidden_vers["mnp"] = { "2.21 EXPERIMENTAL" }
@@ -259,7 +259,7 @@ function mnp.search(from, np)
 			local snp = np
 			snp = netpacket.addIp(snp, n_ip)
 			snp["ttl"] = np["ttl"] - 1
-			modem.send(n_uuid, ports["mnp_srch"], "search", ser.serialize(npi))
+			modem.send(n_uuid, ports["mnp_srch"], "search", ser.serialize(snp))
 		end
 	end
 end
@@ -279,7 +279,7 @@ function mnp.pass(port, mtype, np, data)
 	if np["r"] == true then np["c"]=np["c"]-1
 	else np["c"]=np["c"]+1 end
 
-	local to = ip.findUUID(np["route"][tonumber(num)])
+	local to = ip.findUUID(np["route"]["c"])
 	if not to then
 		mnp.log("MNP","Unsuccessful pass: Unknown IP", 2)
 		mnp.log("MNP","Route crude:" .. ser.serialize(np["route"]), 1)
@@ -287,7 +287,7 @@ function mnp.pass(port, mtype, np, data)
 		for i in pairs(np["route"]) do
 			mnp.log("MNP","<route:" .. tostring(i) .. ">:" .. np["route"][i], 1)
 		end
-		mnp.log("MNP","Tried: "..tostring(num))
+		mnp.log("MNP","Tried: "..tostring(np["c"]))
 		return false
 	end
 	modem.send(to, ports["mnp_data"], mtype, ser.serialize(np), ser.serialize(data))
@@ -369,7 +369,3 @@ m-types:
 --TODO: REDIRECTS
 --IDEA: NODE SOURCE CODE HASH CHECKING
 --CODENAME URBAN ORBIT
-
---REWORK
---TODO: RESET NIPS WHEN RESTARTING
-
