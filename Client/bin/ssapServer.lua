@@ -4,4 +4,5 @@ local cmnp=require("cmnp")
 require("thread").create(cmnp.mncp.c2cPingService):detach()
 if not ssap.serverConnectionManager(application) then
     print("Server was stopped")
+    cmnp.mncp.stopService()
 end
