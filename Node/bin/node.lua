@@ -1,5 +1,5 @@
 --Node (beta)
-local node_ver="[beta build6]"
+local node_ver="[beta build7]"
 local configFile="nodeconfig"
 local component=require("component")
 local computer=require("computer")
@@ -83,6 +83,8 @@ while true do
     mnp.closeNode()
     break
   elseif id=="key_down" and port==57 then
+    mnp.log("NODE","Memory usage: "..tonumber((computer.totalMemory()-computer.freeMemory())/computer.totalMemory()).."%")
+    mnp.log("NODE","Free memory:"..computer.freeMemory().."/"..computer.totalMemory())
     mnp.log("NODE","Node registered IPs:")
     local nips=ip.getAll()
     for n_ip,_ in pairs(nips) do
