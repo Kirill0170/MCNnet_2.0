@@ -1,5 +1,5 @@
 --Node (beta)
-local node_ver="[beta build7]"
+local node_ver="[beta build8]"
 local configFile="nodeconfig"
 local component=require("component")
 local computer=require("computer")
@@ -83,7 +83,10 @@ while true do
     mnp.closeNode()
     break
   elseif id=="key_down" and port==57 then
-    mnp.log("NODE","Memory usage: "..tonumber((computer.totalMemory()-computer.freeMemory())/computer.totalMemory()).."%")
+    mnp.log("NODE","-------------------------")
+    mnp.log("NODE","IP: "..os.getenv("this_ip"))
+    local percentage=tonumber((computer.totalMemory()-computer.freeMemory())/computer.totalMemory())*100
+    mnp.log("NODE","Memory usage: "..string.format("%.0f%",percentage).."%")
     mnp.log("NODE","Free memory:"..computer.freeMemory().."/"..computer.totalMemory())
     mnp.log("NODE","Node registered IPs:")
     local nips=ip.getAll()
@@ -92,6 +95,7 @@ while true do
       if client_ip=="0000" then mnp.log("NODE","  Node "..n_ip)
       else mnp.log("NODE","  Client "..n_ip) end
     end
+    mnp.log("NODE","-------------------------")
   elseif id=="modem_message" then
     thread.create(connection,from,port,mtype,np,data):detach()
   end
