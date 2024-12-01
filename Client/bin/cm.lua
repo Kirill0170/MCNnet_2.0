@@ -1,5 +1,5 @@
 --MNP CONNECTION MANAGER for client
-local ver="ALPHA 0.9"
+local ver="ALPHA 0.9.2"
 local filename="/usr/.cm_last_netname"
 local mnp=require("cmnp")
 local ip=require("ipv2")
@@ -25,6 +25,7 @@ local function help()
   print("                       use 'cm connect' to connect to previous network")
   print("status               current connection status")
   print("disconnect           disconnect from network ")
+  print("reconnect            disconnect & connect")
   print("nping <n> <t>        ping node")
   print("c2cping <n> <t> [ip] Client-to-Client pinging")
   cprint("Options:",0x33CC33)
@@ -148,6 +149,10 @@ local function disconnect()
   if os.getenv("node_uuid") then mnp.disconnect() end
 end
 
+local function reconnect()
+  disconnect()
+  connect()
+end
 local function calculateStats(array)
   local max = array[1]
   local min = array[1]
@@ -236,7 +241,7 @@ local function c2cping(n,t,to_ip)
       else time=roundTime(time) print(i..")Ping: "..time.."s") times[i]=time end
     end
     local max,min,avg=calculateStats(times)
-    print(to_ip.." c2c ping for statistics:")
+    print(to_ip.." c2c ping statistics:")
     print("     max: "..max.."s min: "..min.."s avg: "..avg.."s")
   end
 end
@@ -254,6 +259,7 @@ elseif args[1]=="netsearch" then search(ops["s"],ops["p"])
 elseif args[1]=="nping" then pingNode(ops["n"],ops["t"])
 elseif args[1]=="c2cping" then c2cping(ops["n"],ops["t"],args[2])
 elseif args[1]=="connect" then connect(args[2])
+elseif args[1]=="reconnect" then reconnect()
 else help() end 
 --idea: networks: just display netnames to connect to
 --todo: clear_routes
