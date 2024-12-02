@@ -78,7 +78,8 @@ function ssap.serverConnectionManager(filename) --no UAP support
   thread.create(cmnp.listen,"broadcast","ssap",stopEvent,dataEvent):detach()
   ssap.log("Started SSAP Connection Manager")
   ssap.log("Press space to check current client sessions")
-  sessions={}
+  local sessions={}
+  require(filename).setup()
   while true do
     local id,data,np,key=event.pullMultiple(dataEvent,"interrupted","ssap_stopCM","key_down")
     if id=="interrupted" then
@@ -100,7 +101,7 @@ function ssap.serverConnectionManager(filename) --no UAP support
       data=ser.unserialize(data)
       np=ser.unserialize(np)
       if data[1]=="init" then
-        rdata={}
+        local rdata={}
         rdata[1]="init"
         rdata[2]={}
         rdata[2]["uap"]=false --UAP
@@ -139,7 +140,7 @@ end
 function ssap.getInput(from_ip,timeoutTime,label)--REDO THIS USING DEDICATED INPUT
   if not ip.isIPv2(from_ip) then return nil end
   if not tonumber(timeoutTime) then timeoutTime=120 end
-  sdata={"input_request",{},{}}
+  local sdata={"input_request",{},{}}
   if label then sdata[2]["label"]=label end
   sdata[2]["timeout"]=timeoutTime
   cmnp.send(from_ip,"ssap",sdata)
@@ -210,4 +211,4 @@ m-types:
 (s->c)"clear",{bg_color:0x000000},{}
 ]]
 
---WORKING: MNOT WORKING THREAD.CREATE FOR APPLICATION. RESOLVE
+--SSAP.CLIENT.TEXT  SSAP.SERVER.TEXT!!!

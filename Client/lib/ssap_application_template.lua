@@ -25,7 +25,10 @@ styles["reset"]["fg_color"]="0xFFFFFF"
 local ssap=require("ssap")
 local app={}
 ------------------------
-function app.main(to_ip)
+function app.setup() --will be called once during server start
+  --code
+end
+function app.main(to_ip) --will be used for each client
   --functions
   local function shutdown()
     if config["log"] then print("Shutting down application '"..config["name"].."' with "..to_ip) end
@@ -77,6 +80,7 @@ function app.main(to_ip)
     api.text(str)
     if str=="q" or str=="exit" then
       api.exit()--or os.exit()
+      break
     end
   end
   -----DO NOT EDIT BELOW------:)---------
