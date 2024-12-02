@@ -1,5 +1,5 @@
 --MNP CONNECTION MANAGER for client
-local ver="ALPHA 0.9.2"
+local ver="ALPHA 0.9.3"
 local filename="/usr/.cm_last_netname"
 local mnp=require("cmnp")
 local ip=require("ipv2")
@@ -22,7 +22,7 @@ local function help()
   cprint("Actions:",0x33CC33)
   print("netsearch               search for networks")
   print("connect <name>       connect to network by name; should have connected to this network previously")
-  print("                       use 'cm connect' to connect to previous network")
+  print("                     use 'cm connect' to connect to previous network")
   print("status               current connection status")
   print("disconnect           disconnect from network ")
   print("reconnect            disconnect & connect")
@@ -173,18 +173,6 @@ local function pingNode(n,t)
     cprint("Not connected.",0xFF0000)
     return false
   end
-  if n then
-    if not tonumber(n) then cprint("--n should be given a number, defaulting to 1.",0xFFCC33) n=1 end
-    n=tonumber(n)
-  else
-    n=1
-  end
-  if t then
-    if not tonumber(t) then cprint("--t should be given a number, defaulting to 10",0xFFCC33) t=10 end
-    t=tonumber(t)
-  else
-    t=10
-  end
   print("Pinging node "..string.sub(os.getenv("node_uuid"),1,4)..":0000")
   if n==1 then
     local time=mnp.mncp.nodePing(tonumber(t))
@@ -206,18 +194,6 @@ local function c2cping(n,t,to_ip)
   if not mnp.isConnected() then
     cprint("Not connected.",0xFF0000)
     return false
-  end
-  if n then
-    if not tonumber(n) then cprint("--n should be given a number, defaulting to 1.",0xFFCC33) n=1 end
-    n=tonumber(n)
-  else
-    n=1
-  end
-  if t then
-    if not tonumber(t) then cprint("--t should be given a number, defaulting to 10",0xFFCC33) t=10 end
-    t=tonumber(t)
-  else
-    t=10
   end
   if not ip.isIPv2(to_ip) then cprint("IPv2 needed to ping!",0xFF0000) return false end
   if not mnp.getSavedRoute(to_ip) then
@@ -252,6 +228,15 @@ elseif ops["h"] or ops["help"] then help() end
 
 if ops["p"]==true then mnp.toggleLog(true)
 elseif ops["s"]==true then mnp.toggleLog(false) end
+
+if ops["n"] then
+  if not tonumber(ops["n"]) then cprint("--n should be given a number, defaulting to 1.",0xFFCC33) ops["n"]=1 end
+  ops["n"]=tonumber(ops["n"])
+else ops["n"]=1 end
+if ops["n"] then
+  if not tonumber(ops["n"]) then cprint("--t should be given a number, defaulting to 10",0xFFCC33) ops["n"]=10 end
+  ops["n"]=tonumber(ops["n"])
+else ops["n"]=10 end
 
 if args[1]=="disconnect" then disconnect()
 elseif args[1]=="status" then status()
