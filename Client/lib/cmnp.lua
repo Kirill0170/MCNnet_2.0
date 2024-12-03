@@ -58,12 +58,10 @@ function mnp.log(mod,text, crit)
 end
 --init-----------------------------------
 function mnp.logVersions() 
-	mnp.log("MNP","Starting...")
 	mnp.log("MNP","MNP version " .. mnp_ver)
 	mnp.log("MNP","MNCP version " .. mncp_ver)
 	mnp.log("MNP","NP version " .. netpacket.ver())
 	mnp.log("MNP","IP version " .. ip.ver())
-	mnp.log("MNP","Done")
 end
 local function timer(time,name)
   os.sleep(time)
