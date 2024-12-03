@@ -1,5 +1,5 @@
 --MNP CONNECTION MANAGER for client
-local ver="ALPHA 0.9.3"
+local ver="ALPHA 0.9.4"
 local filename="/usr/.cm_last_netname"
 local mnp=require("cmnp")
 local ip=require("ipv2")
@@ -20,9 +20,12 @@ local function help()
   print("Version "..ver)
   cprint("Usage: cm [action] <options>",0x6699FF)
   cprint("Actions:",0x33CC33)
-  print("netsearch               search for networks")
-  print("connect <name>       connect to network by name; should have connected to this network previously")
-  print("                     use 'cm connect' to connect to previous network")
+  print("ver                  version info")
+  print("help                 show this message")
+  print("netsearch            search for networks")
+  print("connect <name>       connect to network by name;")
+  print("                        should have connected to this network previously")
+  print("                        use 'cm connect' to connect to previous network")
   print("status               current connection status")
   print("disconnect           disconnect from network ")
   print("reconnect            disconnect & connect")
@@ -34,7 +37,11 @@ local function help()
   print("--t=<int>      Timeout time(for ping)")
   print("--n=<int>      Number of iterations(for ping & search)")
 end
-
+local function versions()
+  cprint("MNP Client Connection Manager",0xFFCC33)
+  print("Version "..ver)
+  mnp.logVersions()
+end
 local function status()
   local this_ip=os.getenv("this_ip")
   if not this_ip then
@@ -245,6 +252,8 @@ elseif args[1]=="nping" then pingNode(ops["n"],ops["t"])
 elseif args[1]=="c2cping" then c2cping(ops["n"],ops["t"],args[2])
 elseif args[1]=="connect" then connect(args[2])
 elseif args[1]=="reconnect" then reconnect()
+elseif args[1]=="help" then help()
+elseif args[1]=="ver" then versions()
 else help() end 
 --idea: networks: just display netnames to connect to
 --todo: clear_routes
