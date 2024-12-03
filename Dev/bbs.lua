@@ -1,3 +1,4 @@
+---@diagnostic disable: param-type-mismatch, cast-local-type
 --[[
   BBS SSAP APPLICATION
 ]]
@@ -5,6 +6,7 @@
 local config={}
 config["name"]="BBS" --your application name
 config["log"]=true --log stuff
+config["ver"]="1.0"
 config["sysopPasswd"]="admin" --ADMINISTRATOR PASSWORD
 config["sysopMOTD"]={"Welcome to the "..config["name"].." BBS!","Second line"}
 config["dbFilename"]="/home/bbs.db"
@@ -20,7 +22,6 @@ styles["reset"]["fg_color"]="0xFFFFFF"
 --DO NOT EDIT BELOW
 local ssap=require("ssap")
 local ser=require("serialization")
-local uuid=require("uuid")
 local app={}
 app.db={}
 app.db["name"]="not initialized db"
@@ -130,13 +131,17 @@ function Database:getUserByName(name)
 end
 ----------------------------------------
 function app.setup() --db
+  ssap.log("Started BBS v"..config.ver)
   app.db=Database:load()
+end
+function app.shutdown()
+  app.db:save()
 end
 function app.main(to_ip)
   ---@class User
   local current_user=nil
   --functions
-  local function shutdown()
+  local function stop()
     if config["log"] then print("Shutting down application '"..config["name"].."' with "..to_ip) end
     os.exit()
   end
@@ -176,6 +181,34 @@ function app.main(to_ip)
   end
   -----BBS FUNCTIONS----------------
   local bbs={}
+  bbs.msg={}
+  bbs.util={}
+  bbs.admin={}
+  function bbs.util.numericChoice(max,prefix,message)
+    if not prefix then prefix="" end
+    local chosen=false
+    while not chosen do
+      if type(message)=="table" then 
+        for i=1,#message do
+          api.text(message[i])
+        end
+      end
+      local choice=api.input(40,prefix)
+      if choice:match("^%d+$") ~= nil then
+        choice=tonumber(choice)
+        if choice>0 and choice<=tonumber(max) then
+          return choice
+        end
+      end
+    end
+  end
+  function bbs.util.yesnoChoice()
+    while true do
+      local choice=api.input(40,"[Y/n]:")
+      if choice=="Y" or choice=="y" then return true end
+      if choice=="N" or choice=="n" then return false end
+    end
+  end
   function bbs.login()
     local login=false
     while not login do
@@ -192,37 +225,37 @@ function app.main(to_ip)
             current_user=new_user
             login=true
           end
+        else
+          api.text("Name cannot be empty!")
         end
       else
         local pswd=api.input(20,"Password:")
-        if app.db:getUserByName(username).passwd==pswd then
-          ---@diagnostic disable-next-line: cast-local-type
-          current_user=app.db:getUserByName(username)
-          login=true
+        if app.db:getUserByName(username) then
+          if app.db:getUserByName(username).passwd==pswd then
+            current_user=app.db:getUserByName(username)
+            login=true
+          else
+            api.text("Incorrect password!",styles["error"])
+          end
         else
-          api.text("Incorrect password!",styles["error"])
+          api.text("No such user!")
         end
       end
     end
   end
   function bbs.menu()
-    local chosen=false
-    local valid=5
-    while not chosen do
-      api.text("-----[BBS MENU]-----")
-      api.text("1)Read New Messages("..#app.db.messages-current_user.readMsg..")")
-      api.text("2)New Message")
-      api.text("3)Read Message")
-      api.text("4)Log Off")
-      api.text("--------------------")
-      api.text("Enter single digit")
-      local choice=api.input(60,"[menu]: ")
-      if tonumber(choice) then
-        if 0<tonumber(choice) and tonumber(choice)<valid then return tonumber(choice) end
-      end
-    end
+    local menu_message={
+      "-----[BBS MENU]-----",
+      "1)Read New Messages("..#app.db.messages-current_user.readMsg..")",
+      "2)New Message",
+      "3)Read Message",
+      "4)Mark All As Read",
+      "5)Log Off",
+      "--------------------",
+      "Enter single digit",
+    }
+    return bbs.util.numericChoice(6,"[menu]: ",menu_message)
   end
-  bbs.msg={}
   function bbs.msg.printMessadge(id)
     local msg=app.db:getMessage(id)
     api.text("┌------------------┐")
@@ -242,25 +275,22 @@ function app.main(to_ip)
       bbs.msg.printMessadge(current_user.readMsg)
       api.text("1)Next message")
       api.text("2)Exit")
-      local chosen=false
-      local choice=0
-      while not chosen do
-        local str=tonumber(api.input(20,"[1/2]: "))
-        if str then
-          choice=str
-          if choice>0 and choice<3 then chosen=true end
-        end
-      end
+      local choice=bbs.util.numericChoice(2,"[1/2]:")
       if choice==2 then read=false end
     end
     if read then api.text("No new messages.") end
+  end
+  function bbs.msg.markRead()
+    api.text("Are you sure you want to mark all messages as read?")
+    if bbs.util.yesnoChoice() then
+      current_user.readMsg=#app.db.messages
+    end
   end
   function bbs.msg.textEditor()
     local text={}
     api.text("Enter single . to finish")
     local prev=""
     while prev~="." do
-      ---@diagnostic disable-next-line: cast-local-type
       prev=api.input(120,">")
       if prev=="." then break
       else table.insert(text,prev) end
@@ -270,10 +300,17 @@ function app.main(to_ip)
   function bbs.msg.new()
     api.text("--------------------")
     local new_subject=api.input(30,"Subject: ")
+    if new_subject=="" then 
+      api.text("Subject cannot be empty!")
+      return
+    end
     api.text("---Message----------")
     local new_text=bbs.msg.textEditor()
-    app.db:addMessage(Message:new(current_user.id,new_subject,new_text))
-    api.text("Message saved.")
+    api.text("Save message?")
+    if bbs.util.yesnoChoice() then
+      app.db:addMessage(Message:new(current_user.id,new_subject,new_text))
+      api.text("Message saved.")
+    else api.text("Aborted.") end
   end
   function bbs.msg.read()
     local id=tonumber(api.input(60,"Enter Message ID:"))
@@ -281,6 +318,38 @@ function app.main(to_ip)
     local msg=app.db:getMessage(id)
     if msg then bbs.msg.printMessadge(id)
     else api.text("No message with id: "..id) end
+  end
+  function bbs.admin.menu()
+    local menu_message={
+      "---ADMIN-MENU-----",
+      "1)List all users",
+      "2)Delete user",
+      "3)Promote/demote user"
+    }
+    local choice=bbs.util.numericChoice(3,"ADMIN>: ",menu_message)
+    if choice==1 then bbs.admin.listUsers()
+    elseif choice==2 then
+      local name=api.input(60,"Name: ")
+      if app.db:getUserByName(name) then
+        app.db.users[app.db:getUserByName(name).id]=nil
+      else
+        api.text("No such user!")
+      end
+    elseif choice==3 then
+      local name=api.input(60,"Name: ")
+      if app.db:getUserByName(name) then
+        app.db:getUserByName(name).admin=not app.db:getUserByName(name).admin
+      else
+        api.text("No such user!")
+      end
+    end
+  end
+  function bbs.admin.listUsers()
+    for id,user in pairs(app.db.users) do
+      local stat="user "
+      if user.admin==true then stat="admin" end
+      api.text("ID: "..id.." "..stat.." Name: "..user.name)
+    end
   end
   -----APPLICATION------------------
   if config["log"] then print("Application started") end
@@ -294,10 +363,17 @@ function app.main(to_ip)
     if option==1 then bbs.msg.readNew()
     elseif option==2 then bbs.msg.new()
     elseif option==3 then bbs.msg.read()
-    elseif option==4 then 
+    elseif option==4 then bbs.msg.markRead()
+    elseif option==5 then 
       api.text("Thanks for visiting!")
       api.exit()
       break
+    elseif option==6 then
+      if current_user.admin==true then
+        bbs.admin.menu()
+      else
+        api.text("You are not an admin!")
+      end
     end
   end
   -----DO NOT EDIT BELOW------:)---------
