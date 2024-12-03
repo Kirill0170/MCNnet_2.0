@@ -28,9 +28,12 @@ local app={}
 function app.setup() --will be called once during server start
   --code
 end
+function app.shutdown() --will be called when server stops
+  --code
+end
 function app.main(to_ip) --will be used for each client
   --functions
-  local function shutdown()
+  local function stop()
     if config["log"] then print("Shutting down application '"..config["name"].."' with "..to_ip) end
     os.exit()
   end

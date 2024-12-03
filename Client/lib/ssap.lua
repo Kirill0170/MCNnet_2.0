@@ -83,7 +83,8 @@ function ssap.serverConnectionManager(filename) --no UAP support
   while true do
     local id,data,np,key=event.pullMultiple(dataEvent,"interrupted","ssap_stopCM","key_down")
     if id=="interrupted" then
-      ssap.log("CM interrupted",2)
+      ssap.log("CM stopped",2)
+      require(filename).shutdown()
       computer.pushSignal(stopEvent)
       break 
     elseif id=="ssap_stopCM" then
