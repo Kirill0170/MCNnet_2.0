@@ -1,4 +1,4 @@
-# IT IS STILL UNDER DEVELOPMENT.
+# IT IS STILL UNDER DEVELOPMENT. (Alpha release!)
 # MCNnet_2.0
 Advanced node networking for Open Computers, still under active development.
 
