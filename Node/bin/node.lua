@@ -1,5 +1,5 @@
 --Node (beta)
-local node_ver="[beta2 build1]"
+local node_ver="[beta2 build3]"
 local configFile="nodeconfig"
 local component=require("component")
 local computer=require("computer")
@@ -36,17 +36,24 @@ local function packetThread(thread_id)
     elseif mtype=="netsearch" then
       mnp.networkSearch(from,np,data)
     elseif mtype=="search" then
-      mnp.search(from,np)
-    elseif mtype=="dns_lookup" then
-      mnp.dnsLookup(from,np,data)
+      mnp.search(from,np,data)
     elseif mtype=="mncp_ping" then
       mnp.mncp.nodePing(from)
+    elseif mtype=="setdomain" then
+      mnp.setDomain(np,data[1])
     else --data
       mnp.pass(port,mtype,np,data)
     end
     ThreadStatus[thread_id]="idle"
   end
   mnp.log("Worker"..thread_id,"Offline")
+end
+local function checkDeadThreads()
+  c=0
+  for _,thread in pairs(Threads) do
+    if thread:status()=="dead" then c=c+1 end
+  end
+  return c
 end
 --setup
 os.sleep(0.1)
@@ -67,8 +74,8 @@ else config=require(configFile)
 end
 
 mnp.log("NODE","Checking modem")
-if not modem.isWireless() then mnp.log("NODE","Modem is recommended to be wireless, bro",1) end
-if modem.getStrength()<400 then mnp.log("NODE","Modem strength is recommended to be default 400",1) end
+if not modem.isWireless() then mnp.log("NODE","Modem is recommended to be wireless, bro",1)
+else if modem.getStrength()<400 then mnp.log("NODE","Modem strength is recommended to be default 400",1) end end
 mnp.log("NODE","Setting up ipv2...")
 if not ip.set(ip.gnip(),true) then mnp.log("NODE","Could not set node IP",3) end
 mnp.log("NODE","This node's IPv2 is "..ip.gnip())
@@ -113,6 +120,10 @@ while true do
       else mnp.log("NODE","  Client "..n_ip) end
     end
     mnp.log("NODE","--Worker-Threads---------")
+    local deads=checkDeadThreads()
+    if deads>0 then
+      mnp.log("NODE",deads.." dead threads detected!",2)
+    end
     for i=1,config.threads do
       mnp.log("NODE","Worker "..i.." "..Threads[i]:status().." "..ThreadStatus[i])
     end
@@ -126,8 +137,19 @@ while true do
         break
       end
     end
-    if found==false then mnp.log("NODE","All threads are busy!",1) end
+    if found==false then
+      mnp.log("NODE","All threads are busy!",1)
+      if checkDeadThreads()==config.threads then
+        mnp.log("NODE","All workers are dead!",2)
+        mnp.log("NODE","Rebooting workers!",2)
+        for i=1,config.threads do
+          ThreadStatus[i]="idle"
+          Threads[i]=thread.create(packetThread,i):detach()
+        end
+      end
+    end
   end
 end
-os.sleep(1) --wait until all threads stop
+os.sleep(0.5) --wait until all threads stop
 mnp.log("NODE","Program exited")
+--TODO: DEAD THREADS CHECK

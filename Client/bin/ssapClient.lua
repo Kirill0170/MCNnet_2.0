@@ -1,4 +1,4 @@
-local ver="1.1"
+local ver="1.2"
 local ssap=require("ssap")
 local mnp=require("cmnp")
 local term=require("term")
@@ -29,7 +29,18 @@ function connection(to_ip,timeout)
     if not tonumber(timeout) then cprint("--t should be given a number, defaulting to 10",0xFFCC33) timeout=10 
     else timeout=tonumber(timeout) end
   else timeout=10 end
-  if not mnp.getSavedRoute(to_ip) then
+  local domain=""
+  if mnp.checkHostname(to_ip) then
+    domain=to_ip
+    if not mnp.getFromDomain(domain) then
+      cprint("No route to "..domain.." found. searching...",0xFFCC33)
+      if not mnp.search("",60,domain) then
+        cprint("Failed search",0xFFCC33)
+        return false 
+      end
+    end
+    to_ip=mnp.getFromDomain(domain)[1]
+  elseif not mnp.getSavedRoute(to_ip) then
     cprint("No route to "..to_ip.." found. searching...",0xFFCC33)
     if not mnp.search(to_ip) then
       cprint("Failed search",0xFFCC33)
@@ -47,5 +58,5 @@ end
 local args,ops = shell.parse(...)
 if not args and not ops then help()
 elseif ops["h"] or ops["help"] then help()
-elseif ip.isIPv2(args[1]) then connection(args[1],ops["t"])
+elseif ip.isIPv2(args[1]) or mnp.checkHostname(args[1]) then connection(args[1],ops["t"])
 else help() end 

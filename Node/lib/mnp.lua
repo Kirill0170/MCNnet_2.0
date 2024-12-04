@@ -11,9 +11,8 @@ local thread = require("thread")
 local modem = component.modem
 local event = require("event")
 local ip = require("ipv2")
-local dns = require("dns")
 local gpu = component.gpu
-local mnp_ver = "2.4.4 BETA"
+local mnp_ver = "2.5 BETA"
 local mncp_ver = "2.3.2 REWORK INDEV"
 local forbidden_vers = {}
 forbidden_vers["mnp"] = { "2.21 EXPERIMENTAL" }
@@ -32,6 +31,7 @@ ports["dns_lookup"] = 1009
 local mnp = {}
 mnp.mncp={}
 mnp.networkName = "default" --default network name
+mnp.domains={} --[ipv2]="domain"
 function mnp.log(mod,text, crit)
 	if not mod then mod="MNP" end
 	if not text then text="Unknown" end
@@ -59,13 +59,10 @@ function mnp.log(mod,text, crit)
 end
 --init-----------------------------------
 function mnp.logVersions() 
-	mnp.log("MNP","Starting...")
 	mnp.log("MNP","MNP version " .. mnp_ver)
 	mnp.log("MNP","MNCP version " .. mncp_ver)
 	mnp.log("MNP","NP version " .. netpacket.ver())
 	mnp.log("MNP","IP version " .. ip.ver())
-	mnp.log("MNP","DNS version " .. dns.ver())
-	mnp.log("MNP","Done")
 end
 --MNCP-----------------------------------
 function mnp.mncp.checkService() --rewrite with timer
@@ -88,6 +85,12 @@ function mnp.setNetworkName(newname)
 		mnp.networkName = tostring(newname)
 	end
 end
+function mnp.checkHostname(name) --imported from dns.lua
+  if not name then return false end
+	if type(name)~="string" then return false end
+  local pattern = "^%w+%.%w+$"
+  return string.match(name, pattern) ~= nil
+end
 function mnp.toggleLogs(tLog,tTTL)
 	if type(tLog)=="boolean" then dolog =tLog end
 	if type(tTTL)=="boolean" then ttllog=tTTL end
@@ -105,6 +108,13 @@ function mnp.openPorts(plog)
 end
 function mnp.getPort(keyword)
 	return ports[keyword]
+end
+--DNS-
+function mnp.setDomain(np,domain)
+	if not mnp.checkHostname(domain[1]) then return false end
+	if not netpacket.checkPacket(np) then return false end
+	mnp.domains[np["route"][0]]=domain[1]
+	return true
 end
 --Main-
 function mnp.closeNode()
@@ -205,10 +215,14 @@ function mnp.nodeConnect(connectTime) --on node start, call this
 	end
 	return true
 end
-function mnp.search(from, np)
+function mnp.search(from,np,data)
 	if not ip.isUUID(from) or not netpacket.checkPacket(np) then
 		mnp.log("MNP","Unvalid arguments for search", 2)
 		return false
+	end
+	local dns=false
+	if data then
+		if mnp.checkHostname(data[1]) then dns=true end
 	end
 	if np["ttl"] <= 1 then
 		if ttllog then mnp.log("MNP","Packet"..np["uuid"].." dropped: TTL = 0",1) end
@@ -229,7 +243,8 @@ function mnp.search(from, np)
 		end
 		--SAVE[TODO]
 
-		modem.send(to_uuid, ports["mnp_srch"], "search", ser.serialize(np))
+		if not dns then modem.send(to_uuid, ports["mnp_srch"], "search", ser.serialize(np))
+		else modem.send(to_uuid, ports["mnp_srch"], "search", ser.serialize(np),ser.serialize(data)) end
 	else
 		--check if no current
 		if np["route"][#np["route"]] ~= ip.gnip() then
@@ -237,13 +252,25 @@ function mnp.search(from, np)
 		end
 		--check local
 		for n_ip, n_uuid in pairs(ip.getAll()) do
-			if n_ip == np["t"] then --found
-				np["f"] = true
-				np["r"] = true
-				np = netpacket.addIp(np, n_ip)
-				--dns?
-				modem.send(from, ports["mnp_srch"], "search", ser.serialize(np))
-				return true
+			if dns then
+				if mnp.domains[n_ip] then
+					if mnp.domains[n_ip] == data[1] then
+						np["f"] = true
+						np["r"] = true
+						np = netpacket.addIp(np, n_ip)
+						data[2]=n_ip
+						modem.send(from, ports["mnp_srch"], "search", ser.serialize(np),ser.serialize(data))
+						return true
+					end
+				end
+			else
+				if n_ip == np["t"] then --found
+					np["f"] = true
+					np["r"] = true
+					np = netpacket.addIp(np, n_ip)
+					modem.send(from, ports["mnp_srch"], "search", ser.serialize(np))
+					return true
+				end
 			end
 		end
 		--CHECK SAVED[TODO]
@@ -253,13 +280,14 @@ function mnp.search(from, np)
 		for i=0,#np["route"] do
 		  if np["route"][i]==ip.gnip() then chk=chk+1 end
 		end
-		if chk>1 then return false end
+		if chk>1 then mnp.log("MNP","Looped search! Dropping!",1) return false end
 		--continue search
 		for n_ip, n_uuid in pairs(ip.getNodes(from)) do
 			local snp = np
 			snp = netpacket.addIp(snp, n_ip)
 			snp["ttl"] = np["ttl"] - 1
-			modem.send(n_uuid, ports["mnp_srch"], "search", ser.serialize(snp))
+			if not dns then modem.send(n_uuid, ports["mnp_srch"], "search", ser.serialize(snp))
+			else modem.send(n_uuid, ports["mnp_srch"], "search", ser.serialize(snp),ser.serialize(data)) end
 		end
 	end
 end
