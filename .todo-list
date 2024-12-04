@@ -1,8 +1,5 @@
-fix
-c2c ping
 SSAP client listeners(for chat)
-port support for client-node connenctions
-DNS for clients
+FTP
 MNP: network-wide admin operations:
   get_network
 --future--

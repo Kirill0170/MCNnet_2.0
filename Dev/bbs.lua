@@ -172,6 +172,15 @@ function app.main(to_ip)
     end
     return result
   end
+  function api.keyPress(timeoutTime,only)
+    local result=ssap.getKeyPress(to_ip,timeoutTime,only)
+    if not result then --handle timeout
+      if config["log"] then print("Timeouted during keypress") end
+      ssap.disconnect(to_ip)
+      app.shutdown()
+    end
+    return result
+  end
   function api.clear()
     ssap.send(to_ip,{"clear",{},{}})
   end
@@ -250,11 +259,12 @@ function app.main(to_ip)
       "2)New Message",
       "3)Read Message",
       "4)Mark All As Read",
-      "5)Log Off",
+      "5)List Messages",
+      "6)Log Off",
       "--------------------",
       "Enter single digit",
     }
-    return bbs.util.numericChoice(6,"[menu]: ",menu_message)
+    return bbs.util.numericChoice(7,"[menu]: ",menu_message)
   end
   function bbs.msg.printMessadge(id)
     local msg=app.db:getMessage(id)
@@ -279,6 +289,12 @@ function app.main(to_ip)
       if choice==2 then read=false end
     end
     if read then api.text("No new messages.") end
+  end
+  function bbs.msg.list()
+    api.text("-LIST---------------")
+    for id,msg in pairs(app.db.messages) do
+      api.text("ID: "..id.."|"..app.db:getUserName(msg.userId).." "..msg.subject)
+    end
   end
   function bbs.msg.markRead()
     api.text("Are you sure you want to mark all messages as read?")
@@ -352,7 +368,7 @@ function app.main(to_ip)
     end
   end
   -----APPLICATION------------------
-  if config["log"] then print("Application started") end
+  if config["log"] then print("Application started with "..to_ip) end
   api.text("SSAP BBS")
   api.text("Welcome!")
   api.text("Enter username, or NEW to create a user, or Guest.")
@@ -364,11 +380,12 @@ function app.main(to_ip)
     elseif option==2 then bbs.msg.new()
     elseif option==3 then bbs.msg.read()
     elseif option==4 then bbs.msg.markRead()
-    elseif option==5 then 
+    elseif option==5 then bbs.msg.list()
+    elseif option==6 then 
       api.text("Thanks for visiting!")
       api.exit()
       break
-    elseif option==6 then
+    elseif option==7 then
       if current_user.admin==true then
         bbs.admin.menu()
       else
