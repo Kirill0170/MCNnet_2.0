@@ -1,4 +1,4 @@
-local version="1.3.4 alpha"
+local version="1.4 beta"
 local dolog=true
 local component=require("component")
 local computer=require("computer")
@@ -8,10 +8,12 @@ local event=require("event")
 local ip=require("ipv2")
 local gpu=component.gpu
 local cmnp=require("cmnp")
+local term=require("term")
 local ports={}
 ports["ssap_conn"]=2000
 ports["ssap_data"]=2001
 local ssap={}
+ssap.client={}
 --Util-
 function ssap.log(text,crit)
   cmnp.log("SSAP",text,crit)
@@ -93,6 +95,10 @@ function ssap.serverConnectionManager(filename) --no UAP support
       break
     elseif id=="key_down" then
       if key==57 then
+        ssap.log("IP: "..os.getenv("this_ip"))
+        local percentage=tonumber((computer.totalMemory()-computer.freeMemory())/computer.totalMemory())*100
+        ssap.log("Memory usage: "..string.format("%.0f%%",percentage))
+        ssap.log("Free memory:"..computer.freeMemory().."/"..computer.totalMemory())
         ssap.log("Current sessions:")
         for to_ip,t in pairs(sessions) do
           ssap.log(to_ip.." "..t:status())
@@ -152,13 +158,93 @@ function ssap.getInput(from_ip,timeoutTime,label)--REDO THIS USING DEDICATED INP
   end
   return nil
 end
+function ssap.getKeyPress(from_ip,timeoutTime,only)
+  if not ip.isIPv2(from_ip) then return nil end
+  if not tonumber(timeoutTime) then timeoutTime=120 end
+  local sdata={"keypress_request",{},{}}
+  sdata[2]["timeout"]=timeoutTime
+  if type(only)=="table" then
+    sdata[2]["only"]=only
+  end
+  cmnp.send(from_ip,"ssap",sdata)
+  --no local
+  local rdata=cmnp.receive(from_ip,"ssap",timeoutTime)
+  if rdata[1]=="keypress_response" and type(rdata[3])=="table" then
+    return rdata[3]
+  end
+  return nil
+end
 function ssap.disconnect(to_ip)
   cmnp.send(to_ip,"ssap",{"exit",{},{}})
 end
+function ssap.client.text(options,text)
+  local prev_bg_color=gpu.getBackground()
+  local prev_fg_color=gpu.getForeground()
+  local bg_color=tonumber(options["bg_color"])
+  local fg_color=tonumber(options["fg_color"])
+  local x=tonumber(options["x"])
+  local y=tonumber(options["y"])
+  if bg_color then gpu.setBackground(bg_color) end
+  if options["fg_color"] then gpu.setBackground(fg_color) end
+  if x and y then
+    term.setCursor(x,y)
+    term.write(text[1])
+    term.setCursor(1,y+1)
+  else
+    for _,line in pairs(text) do print(line) end
+  end
+  if not options["keep_color"] then
+    gpu.setBackground(prev_bg_color)
+    gpu.setForeground(prev_fg_color)
+  end
+end
+function ssap.client.input(server_ip,options)
+  if not server_ip then return false end
+  if not options then
+    options={}
+    options["timeout"]=60
+  end
+  if options["label"] then term.write(options["label"]) end
+  local time=computer.uptime()
+  local input=io.read()
+  if computer.uptime()-time>tonumber(options["timeout"]) then --check if timeouted
+    ssap.log("Disconnected: Client timeout",1)
+    return false end --return to end XD
+  local sdata={"input_response",{},{input}}
+  cmnp.send(server_ip,"ssap",sdata)
+  return true
+end
+function ssap.client.keyPress(server_ip,options) --options["only"]={57,...}
+  if not server_ip then return false end
+  if not options then
+    options={}
+    options["timeout"]=60
+  end
+  local time=computer.uptime()
+  local a,b="",""
+  if type(options["only"])=="table" then
+    local checking=true
+    while checking do
+      local _,_,aa,bb=event.pull("key_down")
+      for _,pair in pairs(options["only"]) do
+        if (pair[1]==-1 or aa==pair[1]) and bb==pair[2] then
+          checking=false
+          a=aa; b=bb
+        end
+      end
+    end
+  else
+    _,_,a,b=event.pull("key_down")
+  end
+  if computer.uptime()-time>tonumber(options["timeout"]) then --check if timeouted
+    ssap.log("Disconnected: Client timeout",1)
+    return false end --client-sided timeout
+  local sdata={"keypress_response",{},{a,b}}
+  cmnp.send(server_ip,"ssap",sdata)
+  return true
+end
 function ssap.clientConnection(server_ip,timeoutTime)--REDO THIS USING DEDICATED INPUT
   --0: disconnected 1: server timeout 2: client timeout
-  local gpu=require("component").gpu
-  local term=require("term")
   if not tonumber(timeoutTime) then timeoutTime=30 end
   while true do
     local rdata=cmnp.receive(server_ip,"ssap",timeoutTime)
@@ -169,25 +255,11 @@ function ssap.clientConnection(server_ip,timeoutTime)--REDO THIS USING DEDICATED
     if rdata[1]=="exit" then
       ssap.log("Disconnected: exit")
       return 0
-    elseif rdata[1]=="text" then
-      if rdata[2]["bg_color"] then gpu.setBackground(tonumber(rdata[2]["bg_color"])) end
-      if rdata[2]["fg_color"] then gpu.setForeground(tonumber(rdata[2]["fg_color"])) end
-      if rdata[2]["x"] and rdata[2]["y"] then
-        term.setCursor(tonumber(rdata[2]["x"]),tonumber(rdata[2]["y"]))
-        term.write(rdata[3][1])
-        term.setCursor(1,tonumber(rdata[2]["y"])+1)--next line(needed??)
-      else
-        print(rdata[3][1])
-      end
+    elseif rdata[1]=="text" then ssap.client.text(rdata[2],rdata[3])
     elseif rdata[1]=="input_request" then
-      if rdata[2]["label"] then term.write(rdata[2]["label"]) end
-      local time=computer.uptime()
-      local input=io.read()
-      if computer.uptime()-time>tonumber(rdata[2]["timeout"]) then --check if timeouted
-        ssap.log("Disconnected: Client timeout",1)
-        return 2 end --return to end XD
-      local sdata={"input_response",{},{input}}
-      cmnp.send(server_ip,"ssap",sdata)
+      if not ssap.client.input(server_ip,rdata[2]) then return 2 end
+    elseif rdata[1]=="keypress_request" then
+      if not ssap.client.keyPress(server_ip,rdata[2]) then return 2 end
     elseif rdata[1]=="clear" then
       term.clear()
     else
@@ -205,11 +277,11 @@ data:
 m-types:
 (s<-c)"init",{"version"="<ssap version>"},{}
 (s->c)"init",{"uap"=true/false},{"OK/CR"}
-(s->c)"text",{x:0,y:0,fgcol:0xFFFFFF,bgcol:"default"},{"<sample text>"}
+(s->c)"text",{x:0,y:0,fgcol:0xFFFFFF,bgcol:"default"},{"<sample text>","<sample text line 2>"}
 (s->c)"input_request",{"label"="<nil/string>","timeout"=<int>},{}
 (s<-c)"input_response",{},{"<input>"}
+(s->c)"keypress_request",{"timeout"=<int>,"only"={{-1,57},{32,57}}},{}
+(c<-s)"keypress_response",{},{<int>,<int>}
 (s->c)"exit",{},{}
 (s->c)"clear",{bg_color:0x000000},{}
 ]]
-
---SSAP.CLIENT.TEXT  SSAP.SERVER.TEXT!!!

@@ -64,6 +64,15 @@ function app.main(to_ip) --will be used for each client
     end
     return result
   end
+  function api.keyPress(timeoutTime,only)
+    local result=ssap.getKeyPress(to_ip,timeoutTime,only)
+    if not result then --handle timeout
+      if config["log"] then print("Timeouted during keypress") end
+      ssap.disconnect(to_ip)
+      app.shutdown()
+    end
+    return result
+  end
   function api.clear()
     ssap.send(to_ip,{"clear",{},{}})
   end
@@ -78,6 +87,8 @@ function app.main(to_ip) --will be used for each client
   api.text("SSAP APP TEMPLATE") --text
   api.text("Hello world!",styles["example"]) -- styled text: use styles
   api.text("test",styles["reset"],{2,2}) --positioned text: {x,y}
+  api.text("Press space")
+  local a,b=api.keyPress(60,{{-1,57}}) --key press(-1 = any a, 57=space)
   while true do --main loop(You don't want your application to finish, right?)
     local str=api.input(60,"[Enter string]>")
     api.text(str)
