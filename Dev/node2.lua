@@ -67,8 +67,8 @@ else config=require(configFile)
 end
 
 mnp.log("NODE","Checking modem")
-if not modem.isWireless() then mnp.log("NODE","Modem is recommended to be wireless, bro",1) end
-if modem.getStrength()<400 then mnp.log("NODE","Modem strength is recommended to be default 400",1) end
+if not modem.isWireless() then mnp.log("NODE","Modem is recommended to be wireless, bro",1)
+else if modem.getStrength()<400 then mnp.log("NODE","Modem strength is recommended to be default 400",1) end end
 mnp.log("NODE","Setting up ipv2...")
 if not ip.set(ip.gnip(),true) then mnp.log("NODE","Could not set node IP",3) end
 mnp.log("NODE","This node's IPv2 is "..ip.gnip())
