@@ -1,4 +1,4 @@
-local version="1.4 beta"
+local version="1.4.2 beta"
 local dolog=true
 local component=require("component")
 local computer=require("computer")
@@ -79,11 +79,11 @@ function ssap.serverConnectionManager(filename) --no UAP support
   local dataEvent="ssapListenerData"
   thread.create(cmnp.listen,"broadcast","ssap",stopEvent,dataEvent):detach()
   ssap.log("Started SSAP Connection Manager")
-  ssap.log("Press space to check current client sessions")
+  ssap.log("Press space to check status")
   local sessions={}
   require(filename).setup()
   while true do
-    local id,data,np,key=event.pullMultiple(dataEvent,"interrupted","ssap_stopCM","key_down")
+    local id,data,from_ip,key=event.pullMultiple(dataEvent,"interrupted","ssap_stopCM","key_down")
     if id=="interrupted" then
       ssap.log("CM stopped",2)
       require(filename).shutdown()
@@ -100,22 +100,21 @@ function ssap.serverConnectionManager(filename) --no UAP support
         ssap.log("Memory usage: "..string.format("%.0f%%",percentage))
         ssap.log("Free memory:"..computer.freeMemory().."/"..computer.totalMemory())
         ssap.log("Current sessions:")
-        for to_ip,t in pairs(sessions) do
-          ssap.log(to_ip.." "..t:status())
+        for s_ip,t in pairs(sessions) do
+          ssap.log(s_ip.." "..t:status())
         end
       end
     else
       data=ser.unserialize(data)
-      np=ser.unserialize(np)
       if data[1]=="init" then
         local rdata={}
         rdata[1]="init"
         rdata[2]={}
         rdata[2]["uap"]=false --UAP
-        local to_ip=np["route"][0]
+        local to_ip=from_ip
         if data[2]["version"]==version then
           rdata[3]={"OK",""}
-          cmnp.sendBack("ssap",np,rdata)
+          cmnp.send(to_ip,"ssap",rdata)
           --wait for client start
           local check_data=cmnp.receive(to_ip,"ssap",10)
           if not check_data or check_data[1]~="start" then ssap.log("Client didn't start app",1)
@@ -127,7 +126,7 @@ function ssap.serverConnectionManager(filename) --no UAP support
           end
         else
           rdata[3]={"CR","Different SSAP version!"}
-          cmnp.sendBack("ssap",np,rdata)
+          cmnp.send(to_ip,"ssap",rdata)
         end
       end
     end
