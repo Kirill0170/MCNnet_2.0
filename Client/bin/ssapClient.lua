@@ -1,7 +1,6 @@
 local ver="1.2"
 local ssap=require("ssap")
 local mnp=require("cmnp")
-local term=require("term")
 local shell=require("shell")
 local ip=require("ipv2")
 local component=require("component")
@@ -36,7 +35,7 @@ function connection(to_ip,timeout)
       cprint("No route to "..domain.." found. searching...",0xFFCC33)
       if not mnp.search("",60,domain) then
         cprint("Failed search",0xFFCC33)
-        return false 
+        return false
       end
     end
     to_ip=mnp.getFromDomain(domain)[1]
@@ -44,7 +43,7 @@ function connection(to_ip,timeout)
     cprint("No route to "..to_ip.." found. searching...",0xFFCC33)
     if not mnp.search(to_ip) then
       cprint("Failed search",0xFFCC33)
-      return false 
+      return false
     end
   end
   if not mnp.getSavedRoute(to_ip) then cprint("Couldn't get route for "..to_ip,2) return false end
@@ -59,4 +58,5 @@ local args,ops = shell.parse(...)
 if not args and not ops then help()
 elseif ops["h"] or ops["help"] then help()
 elseif ip.isIPv2(args[1]) or mnp.checkHostname(args[1]) then connection(args[1],ops["t"])
-else help() end 
+else help() end
+--TODO: VERSION CHECKING
