@@ -1,4 +1,4 @@
-local ver="1.2"
+local ver="1.25"
 local ssap=require("ssap")
 local mnp=require("cmnp")
 local shell=require("shell")
@@ -16,6 +16,7 @@ end
 local function help()
   cprint("SSAP client connection",0xFFCC33)
   print("Version "..ver)
+  print("SSAp version: "..ssap.getVersion())
   print("About: simple SSAP conenction client")
   cprint("Usage: client <options> server_ip",0x6699FF)
   cprint("Options:",0x33CC33)
