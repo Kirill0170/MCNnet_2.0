@@ -13,7 +13,7 @@ local thread=require("thread")
 local event=require("event")
 local ip=require("ipv2")
 local gpu=component.gpu
-local mnp_ver="2.5 BETA"
+local mnp_ver="2.5.2 BETA"
 local mncp_ver="2.4.1 INDEV"
 local forbidden_vers={}
 forbidden_vers["mnp"]={"2.21 EXPERIMENTAL"}
@@ -462,14 +462,6 @@ function mnp.send(to_ip,mtype,data,do_search)
   modem.send(to_uuid,ports["mnp_data"],mtype,ser.serialize(np),ser.serialize(data))
   return 0
 end
-function mnp.sendBack(mtype,np,data)--REVIEW
-  if not mnp.isConnected() then return false end
-  if not netpacket.checkPacket(np) then return false end
-  np["r"]=true
-  np["c"]=np["c"]-1
-  if not data then data={} end
-  modem.send(os.getenv("node_uuid"),ports["mnp_data"],mtype,ser.serialize(np),ser.serialize(data))
-end
 function mnp.receive(from_ip,mtype,timeoutTime,rememberRoute)--REVIEW
   if not mnp.isConnected() then return nil end
   if not mtype then return nil end
@@ -491,7 +483,7 @@ function mnp.receive(from_ip,mtype,timeoutTime,rememberRoute)--REVIEW
               mnp.saveRoute(np["route"][0],netpacket.reverseRoute(np["route"]))
             end
           end
-          return ser.unserialize(data)
+          return ser.unserialize(data),np
         end
       end
     end
@@ -510,7 +502,7 @@ function mnp.listen(from_ip,mtype,stopEvent,dataEvent)
         data=ser.unserialize(data)
         if netpacket.checkPacket(np) and from==os.getenv("node_uuid") and port==ports["mnp_data"] and rmtype==mtype and data then
           if np["t"]==from_ip or np["route"][0]==from_ip or from_ip=="broadcast" then
-            computer.pushSignal(dataEvent,ser.serialize(data),ser.serialize(np))
+            computer.pushSignal(dataEvent,ser.serialize(data),np["route"][0])
           end
         end
       end
