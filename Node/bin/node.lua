@@ -1,5 +1,5 @@
 --Node (beta)
-local node_ver="[beta2 build3]"
+local node_ver="[beta2 build4]"
 local configFile="nodeconfig"
 local component=require("component")
 local computer=require("computer")
@@ -12,7 +12,6 @@ local gpu=component.gpu
 local mnp=require("mnp")
 local netpacket=require("netpacket")
 local ip=require("ipv2")
-local dns=require("dns")
 Threads={}
 ThreadStatus={}
 local function packetThread(thread_id)
@@ -80,8 +79,6 @@ mnp.log("NODE","Setting up ipv2...")
 if not ip.set(ip.gnip(),true) then mnp.log("NODE","Could not set node IP",3) end
 mnp.log("NODE","This node's IPv2 is "..ip.gnip())
 if config.clearNIPS then ip.removeAll() end
-mnp.log("NODE","Setting up DNS...")
-dns.init()
 mnp.log("NODE","Setting up MNP..")
 mnp.logVersions()
 if not mnp.openPorts() then mnp.log("NODE","Could not open ports",3) end

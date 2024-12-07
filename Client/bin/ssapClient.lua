@@ -1,4 +1,4 @@
-local ver="1.25"
+local ver="1.3"
 local ssap=require("ssap")
 local mnp=require("cmnp")
 local shell=require("shell")
@@ -16,7 +16,7 @@ end
 local function help()
   cprint("SSAP client connection",0xFFCC33)
   print("Version "..ver)
-  print("SSAp version: "..ssap.getVersion())
+  print("SSAP version: "..ssap.getVersion())
   print("About: simple SSAP conenction client")
   cprint("Usage: client <options> server_ip",0x6699FF)
   cprint("Options:",0x33CC33)
@@ -48,10 +48,13 @@ function connection(to_ip,timeout)
     end
   end
   if not mnp.getSavedRoute(to_ip) then cprint("Couldn't get route for "..to_ip,2) return false end
+  if domain~="" then print("Connecting to "..domain.."("..to_ip..")")
+  else print("Connectiong to "..to_ip) end
   if not ssap.clientConnect(to_ip,timeout) then
     print("Exiting")
   else
     ssap.clientConnection(to_ip,timeout)
+    print("Closed connection to "..to_ip)
   end
 end
 --main

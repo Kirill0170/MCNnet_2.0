@@ -85,6 +85,7 @@ function mnp.mncp.c2cPingService(debug)
       end
     end
   end
+  mnp.log("MNP","Stopped MNCP c2c ping service")
 end
 function mnp.mncp.stopService() computer.pushSignal("mncp_stop") end
 function mnp.mncp.nodePing(timeoutTime)
