@@ -1,4 +1,4 @@
-local ver="1.3"
+local ver="1.4"
 local ssap=require("ssap")
 local mnp=require("cmnp")
 local shell=require("shell")
@@ -53,8 +53,16 @@ function connection(to_ip,timeout)
   if not ssap.clientConnect(to_ip,timeout) then
     print("Exiting")
   else
-    ssap.clientConnection(to_ip,timeout)
-    print("Closed connection to "..to_ip)
+    local rcode=ssap.clientConnection(to_ip,timeout)
+    if rcode==0 then
+      print("Closed connection to "..to_ip)
+    elseif rcode==1 then
+      cprint("Timeouted!",0xFFFF33)
+    elseif rcode==2 then
+      cprint("Client-side timeout/error",0xFFCC33)
+    else
+      print("Unknown return code!",rcode)
+    end
   end
 end
 --main

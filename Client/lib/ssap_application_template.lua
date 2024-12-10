@@ -53,7 +53,8 @@ function app.main(to_ip) --will be used for each client
       options["x"]=tonumber(position[1])
       options["y"]=tonumber(position[2])
     end
-    ssap.send(to_ip,{"text",options,{text}})
+    if type(text)=="string" then text={text} end
+    ssap.send(to_ip,{"text",options,text})
   end
   function api.input(timeoutTime,label)
     local result=ssap.getInput(to_ip,timeoutTime,label)

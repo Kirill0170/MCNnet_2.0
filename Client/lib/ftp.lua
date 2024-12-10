@@ -1,7 +1,7 @@
 local mnp=require("cmnp")
 local ip=require("ipv2")
 local ser=require("serialization")
-local version="1.0"
+local version="1.1"
 local ftp={}
 ftp.maxPacketLen=1024
 function ftp.ver() return version end
@@ -40,7 +40,7 @@ function ftp.checkIntegrity(transmissionSize,filePackets)
       table.insert(lostPackets,i)
     end
   end
-  if lostPackets=={} then lostPackets=nil end
+  if lostPackets[1]==nil then lostPackets=nil end
   return lostPackets
 end
 function ftp.request(to_ip,requestFileName,writeFileName,closeAfter)
@@ -90,8 +90,11 @@ function ftp.request(to_ip,requestFileName,writeFileName,closeAfter)
       return true
     elseif rdata[1]=="transmissionFail" then
       if rdata[3][1]=="No such file" then
-        mnp.log("No such file: "..to_ip.."#"..requestFileName)
+        mnp.log("FTP","No such file: "..to_ip..":"..requestFileName,1)
       end
+      return false,rdata[3][1]
+    elseif rdata[1]=="transmissionDeny" then
+      mnp.log("FTP","Transmission denied: "..rdata[3][1],3)
       return false,rdata[3][1]
     else
       return false,"Unknown"
@@ -187,11 +190,18 @@ function ftp.serverConnectionInit(to_ip,rdata)
     return true
   else mnp.log("FTP","Packet type is not init! "..rdata[1],1) return false end
 end
-function ftp.serverConnection(to_ip)
+function ftp.serverConnection(to_ip,only)
   while true do
     local rdata=mnp.receive(to_ip,"ftp",30)
     if ftp.checkData(rdata) then
       if rdata[1]=="request" then
+        if type(only)=="string" then
+          if rdata[3][1]~=only then
+            --forbidden
+            mnp.send(to_ip,"ftp",{"transmissionDeny",{},{"Incorrect file: "..tostring(rdata[3][1]).."; expected: "..only}})
+            return false
+          end
+        end
         ftp.upload(to_ip,rdata[3][1])
       elseif rdata[1]=="end" then
         print("debug: ended!")
@@ -211,3 +221,4 @@ return ftp
   1. connection init
   2. send/request files 
 ]]
+--TODO: CHECK ONE-LINE>MAXPACKETSIZE
