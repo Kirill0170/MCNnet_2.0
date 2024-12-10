@@ -6,7 +6,7 @@
 local config={}
 config["name"]="BBS" --your application name
 config["log"]=true --log stuff
-config["ver"]="1.0"
+config["ver"]="1.0.2"
 config["sysopPasswd"]="admin" --ADMINISTRATOR PASSWORD
 config["sysopMOTD"]={"Welcome to the "..config["name"].." BBS!","Second line"}
 config["dbFilename"]="/home/bbs.db"
@@ -161,7 +161,8 @@ function app.main(to_ip)
       options["x"]=tonumber(position[1])
       options["y"]=tonumber(position[2])
     end
-    ssap.send(to_ip,{"text",options,{text}})
+    if type(text)=="string" then text={text} end
+    ssap.send(to_ip,{"text",options,text})
   end
   function api.input(timeoutTime,label)
     local result=ssap.getInput(to_ip,timeoutTime,label)
@@ -197,10 +198,8 @@ function app.main(to_ip)
     if not prefix then prefix="" end
     local chosen=false
     while not chosen do
-      if type(message)=="table" then 
-        for i=1,#message do
-          api.text(message[i])
-        end
+      if type(message)=="table" then
+        api.text(message)
       end
       local choice=api.input(40,prefix)
       if choice:match("^%d+$") ~= nil then
@@ -268,15 +267,18 @@ function app.main(to_ip)
   end
   function bbs.msg.printMessadge(id)
     local msg=app.db:getMessage(id)
-    api.text("┌------------------┐")
-    api.text("|Subject: "..msg.subject)
-    api.text("|From: "..app.db:getUserName(msg.userId))
-    api.text("|Date: "..msg.date..";  ID: "..msg.id)
-    api.text("├------------------┘")
+    local message={
+    "┌------------------┐",
+    "|Subject: "..msg.subject,
+    "|From: "..app.db:getUserName(msg.userId),
+    "|Date: "..msg.date..";  ID: "..msg.id,
+    "├------------------┘",
+    }
     for _,line in pairs(msg.text) do
-      api.text("|"..line)
+      table.insert(message,"|"..line)
     end
-    api.text("└------------------┘")
+    table.insert(message,"└------------------┘")
+    api.text(message)
   end
   function bbs.msg.readNew()
     local read=true
