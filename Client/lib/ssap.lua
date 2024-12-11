@@ -1,4 +1,4 @@
-local version="1.5 ftp beta"
+local version="1.6 ftp gamma"
 local component=require("component")
 local computer=require("computer")
 local ser=require("serialization")
@@ -10,59 +10,28 @@ local cmnp=require("cmnp")
 local term=require("term")
 local ssap={}
 ssap.client={}
-ssap.ftp={}
---Util-
+ssap.server={}
+--Util-----------------------
 function ssap.log(text,crit)
   cmnp.log("SSAP",text,crit)
 end
-function ssap.getVersion() return version end
---Main--
+function ssap.safeRequire(modname)
+  if not modname then return nil end
+  local success,module=pcall(function ()
+    return require(modname)
+  end)
+  if success then return module
+  else ssap.log("Couldn't require "..modname..": "..module,2) return nil end
+end
 function ssap.checkData(data) --{"packet_type",{options},{data}}
   if type(data)~="table" then return false end
   if type(data[1])~="string" then return false end
   if type(data[2])~="table" or type(data[3])~="table" then return false end
   return true
 end
-function ssap.clientConnect(to_ip,timeoutTime)--REDO AND FIX ISSUES
-  if not ip.isIPv2(to_ip) then return false end
-  if not cmnp.isConnected() then return false end
-  if not timeoutTime then timeoutTime=10 end --ssap connection should be fast
-  local data={"init",{},{}}
-  data[2]["version"]=version
-  local success=cmnp.send(to_ip,"ssap",data)
-  if success~=0 then
-    if success==1 then
-      ssap.log("Not connected",1)
-    elseif success==3 then
-      ssap.log("Couldn't find host",1)
-    end
-    return false
-  end
-  local rdata=cmnp.receive(to_ip,"ssap",timeoutTime)
-  if not rdata then
-    ssap.log("Could not connect to server: timeout",1)
-    return false
-  elseif not ssap.checkData(rdata) then
-    ssap.log("Invalid packet received!",1)
-    ssap.log("debug: "..ser.serialize(rdata),1)
-    return false
-  end
-  if rdata[1]=="init" then
-    if rdata[3][1]=="OK" then
-      if rdata[2]["uap"]==true then
-        --uap here
-      end
-      cmnp.send(to_ip,"ssap",{"start"})--start
-      return true
-    elseif rdata[3][1]=="CR" then
-      ssap.log("Connection refused",1)
-      return false
-    end
-  end
-  ssap.log("Could not connect to server: wrong packet!",1)
-  return false
-end
-function ssap.serverConnectionManager(filename) --no UAP support
+function ssap.ver() return version end
+--Main------------------------
+function ssap.server.connectionManager(filename) --no UAP support
   local fs=require("filesystem")
   if not fs.exists("/lib/"..filename..".lua") then
     ssap.log("Couldn't start SSAP CM: no such file: "..filename,2)
@@ -118,7 +87,7 @@ function ssap.serverConnectionManager(filename) --no UAP support
           else
             --check if already started thread
             if sessions[to_ip] then sessions[to_ip]:kill() end
-            local t=thread.create(ssap.application,filename,to_ip):detach()
+            local t=thread.create(ssap.server.application,filename,to_ip):detach()
             sessions[to_ip]=t
           end
         else
@@ -129,7 +98,7 @@ function ssap.serverConnectionManager(filename) --no UAP support
     end
   end
 end
-function ssap.application(filepath,to_ip)
+function ssap.server.application(filepath,to_ip)
   if not require("filesystem").exists("/lib/"..filepath..".lua") then
     ssap.log("Could not open application file",3)
   end
@@ -140,7 +109,7 @@ end
 function ssap.send(to_ip,data)
   cmnp.send(to_ip,"ssap",data)
 end
-function ssap.getInput(from_ip,timeoutTime,label)--REDO THIS USING DEDICATED INPUT
+function ssap.server.getInput(from_ip,timeoutTime,label)--REDO THIS USING DEDICATED INPUT
   if not ip.isIPv2(from_ip) then return nil end
   if not tonumber(timeoutTime) then timeoutTime=120 end
   local sdata={"input_request",{},{}}
@@ -154,7 +123,7 @@ function ssap.getInput(from_ip,timeoutTime,label)--REDO THIS USING DEDICATED INP
   end
   return nil
 end
-function ssap.getKeyPress(from_ip,timeoutTime,only)
+function ssap.server.getKeyPress(from_ip,timeoutTime,only)
   if not ip.isIPv2(from_ip) then return nil end
   if not tonumber(timeoutTime) then timeoutTime=120 end
   local sdata={"keypress_request",{},{}}
@@ -170,19 +139,47 @@ function ssap.getKeyPress(from_ip,timeoutTime,only)
   end
   return nil
 end
-function ssap.sendFile(to_ip,filename)
-  local ftp=ssap.safeRequire("ftp")
-  if not ftp then return false
-  else
-    ssap.send(to_ip,{"ftp_file_get",{},{filename}})
-    if not ftp.serverConnectionAwait(to_ip,30) then
-    else
-      ftp.serverConnection(to_ip,filename)
-    end
-  end
-end
 function ssap.disconnect(to_ip)
   cmnp.send(to_ip,"ssap",{"exit",{},{}})
+end
+function ssap.client.connect(to_ip,timeoutTime)
+  if not ip.isIPv2(to_ip) then return false end
+  if not cmnp.isConnected() then return false end
+  if not timeoutTime then timeoutTime=10 end --ssap connection should be fast
+  local data={"init",{},{}}
+  data[2]["version"]=version
+  local success=cmnp.send(to_ip,"ssap",data)
+  if success~=0 then
+    if success==1 then
+      ssap.log("Not connected",1)
+    elseif success==3 then
+      ssap.log("Couldn't find host",1)
+    end
+    return false
+  end
+  local rdata=cmnp.receive(to_ip,"ssap",timeoutTime)
+  if not rdata then
+    ssap.log("Could not connect to server: timeout",1)
+    return false
+  elseif not ssap.checkData(rdata) then
+    ssap.log("Invalid packet received!",1)
+    ssap.log("debug: "..ser.serialize(rdata),1)
+    return false
+  end
+  if rdata[1]=="init" then
+    if rdata[3][1]=="OK" then
+      if rdata[2]["uap"]==true then
+        --uap here
+      end
+      cmnp.send(to_ip,"ssap",{"start"})--start
+      return true
+    elseif rdata[3][1]=="CR" then
+      ssap.log("Connection refused",1)
+      return false
+    end
+  end
+  ssap.log("Could not connect to server: wrong packet!",1)
+  return false
 end
 function ssap.client.text(options,text)
   local prev_bg_color=gpu.getBackground()
@@ -250,32 +247,7 @@ function ssap.client.keyPress(server_ip,options) --options["only"]={57,...}
   cmnp.send(server_ip,"ssap",sdata)
   return true
 end
-function ssap.safeRequire(modname)
-  if not modname then return nil end
-  local success,module=pcall(function ()
-    return require(modname)
-  end)
-  if success then return module
-  else ssap.log("Couldn't require "..modname..": "..module,2) return nil end
-end
-function ssap.ftp.GetFile(server_ip,getfilename,writefilename)
-  if not ip.isIPv2(server_ip) then return false end
-  if not getfilename then return false end
-  if not writefilename then writefilename=getfilename end
-  local ftp=ssap.safeRequire("ftp")
-  if not ftp then return false end
-  if ftp.connection(server_ip) then
-    local success,code=ftp.request(server_ip,getfilename,writefilename,true)
-    if success then return true
-    else
-      ssap.log("Require fail: "..tostring(code),1)
-      return false
-    end
-  else
-    ssap.log("Couldn't establish connection!")
-  end
-end
-function ssap.clientConnection(server_ip,timeoutTime)--REDO THIS USING DEDICATED INPUT
+function ssap.client.connection(server_ip,timeoutTime)--REDO THIS USING DEDICATED INPUT
   --0: disconnected 1: server timeout 2: client timeout
   if not tonumber(timeoutTime) then timeoutTime=30 end
   while true do
@@ -293,12 +265,41 @@ function ssap.clientConnection(server_ip,timeoutTime)--REDO THIS USING DEDICATED
     elseif rdata[1]=="keypress_request" then
       if not ssap.client.keyPress(server_ip,rdata[2]) then return 2 end
     elseif rdata[1]=="ftp_file_get" then
-      if not ssap.ftp.GetFile(server_ip,rdata[3][1]) then return 2 end
+      if not ssap.client.GetFile(server_ip,rdata[3][1]) then return 2 end
     elseif rdata[1]=="clear" then
       term.clear()
     else
       ssap.log("Unknown ssap header: "..tostring(rdata[1]),1)
     end
+  end
+end
+--FTP------------------------------------------
+function ssap.server.sendFile(to_ip,filename)
+  local ftp=ssap.safeRequire("ftp")
+  if not ftp then return false
+  else
+    ssap.send(to_ip,{"ftp_file_get",{},{filename}})
+    if not ftp.serverConnectionAwait(to_ip,30) then
+    else
+      ftp.serverConnection(to_ip,filename)
+    end
+  end
+end
+function ssap.client.GetFile(server_ip,getfilename,writefilename)
+  if not ip.isIPv2(server_ip) then return false end
+  if not getfilename then return false end
+  if not writefilename then writefilename=getfilename end
+  local ftp=ssap.safeRequire("ftp")
+  if not ftp then return false end
+  if ftp.connection(server_ip) then
+    local success,code=ftp.request(server_ip,getfilename,writefilename,true)
+    if success then return true
+    else
+      ssap.log("Require fail: "..tostring(code),1)
+      return false
+    end
+  else
+    ssap.log("Couldn't establish connection!")
   end
 end
 return ssap
@@ -316,7 +317,8 @@ m-types:
 (s<-c)"input_response",{},{"<input>"}
 (s->c)"keypress_request",{"timeout"=<int>,"only"={{-1,57},{32,57}}},{}
 (c<-s)"keypress_response",{},{<int>,<int>}
-(c->s)"ftp_file_get",{},{<filename>}
+(c<-s)"ftp_file_get",{},{<filename>}
+(c<-s)"ftp_file_upload",{},{<filename>}
 (s->c)"exit",{},{}
 (s->c)"clear",{bg_color:0x000000},{}
 ]]
