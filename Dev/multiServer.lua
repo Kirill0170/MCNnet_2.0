@@ -37,7 +37,7 @@ function ftpServ()
 end
 function ssapServ()
   print("Started SSAP server!")
-  ssap.serverConnectionManager(application)
+  ssap.server.connectionManager(application)
 end
 
 print("Starting FTP+SSAP servers")
