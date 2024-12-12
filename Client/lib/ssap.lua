@@ -1,4 +1,4 @@
-local version="1.6 ftp gamma"
+local version="1.6.1"
 local component=require("component")
 local computer=require("computer")
 local ser=require("serialization")
@@ -91,7 +91,7 @@ function ssap.server.connectionManager(filename) --no UAP support
             sessions[to_ip]=t
           end
         else
-          rdata[3]={"CR","Different SSAP version!"}
+          rdata[3]={"CR","Different SSAP version! Expected: <"..version.."> Got: <"..tostring(rdata[2]["version"]..">")}
           cmnp.send(to_ip,"ssap",rdata)
         end
       end
@@ -174,7 +174,7 @@ function ssap.client.connect(to_ip,timeoutTime)
       cmnp.send(to_ip,"ssap",{"start"})--start
       return true
     elseif rdata[3][1]=="CR" then
-      ssap.log("Connection refused",1)
+      ssap.log("Connection refused: "..tostring(rdata[3][2]),1)
       return false
     end
   end
@@ -189,7 +189,7 @@ function ssap.client.text(options,text)
   local x=tonumber(options["x"])
   local y=tonumber(options["y"])
   if bg_color then gpu.setBackground(bg_color) end
-  if fg_color then gpu.setBackground(fg_color) end
+  if fg_color then gpu.setForeground(fg_color) end
   if x and y then
     term.setCursor(x,y)
     term.write(text[1])
@@ -265,7 +265,9 @@ function ssap.client.connection(server_ip,timeoutTime)--REDO THIS USING DEDICATE
     elseif rdata[1]=="keypress_request" then
       if not ssap.client.keyPress(server_ip,rdata[2]) then return 2 end
     elseif rdata[1]=="ftp_file_get" then
-      if not ssap.client.GetFile(server_ip,rdata[3][1]) then return 2 end
+      if not ssap.client.GetFile(server_ip,rdata[3][1],rdata[3][1],rdata[3][2]) then return 3 end
+    elseif rdata[1]=="ftp_file_put" then
+      if not ssap.client.SendFile(server_ip,rdata[3][1]) then return 3 end
     elseif rdata[1]=="clear" then
       term.clear()
     else
@@ -274,25 +276,57 @@ function ssap.client.connection(server_ip,timeoutTime)--REDO THIS USING DEDICATE
   end
 end
 --FTP------------------------------------------
-function ssap.server.sendFile(to_ip,filename)
+function ssap.server.sendFile(to_ip,filename,clientPretty)
+  if not ip.isIPv2(to_ip) then return false end
+  if not filename then return false end
+  if not clientPretty then clientPretty=false end
   local ftp=ssap.safeRequire("ftp")
   if not ftp then return false
   else
-    ssap.send(to_ip,{"ftp_file_get",{},{filename}})
+    ssap.send(to_ip,{"ftp_file_get",{},{filename,clientPretty}})
     if not ftp.serverConnectionAwait(to_ip,30) then
     else
       ftp.serverConnection(to_ip,filename)
     end
   end
 end
-function ssap.client.GetFile(server_ip,getfilename,writefilename)
+function ssap.server.requestFile(to_ip,filename)
+  if not ip.isIPv2(to_ip) then return false end
+  if not filename then return false end
+  local ftp=ssap.safeRequire("ftp")
+  if not ftp then return false
+  else
+    ssap.send(to_ip,{"ftp_file_put",{},{filename}})
+    if not ftp.serverConnectionAwait(to_ip,30) then
+    else
+      ftp.serverConnection(to_ip,filename)
+    end
+  end
+end
+function ssap.client.GetFile(server_ip,getfilename,writefilename,pretty)
   if not ip.isIPv2(server_ip) then return false end
   if not getfilename then return false end
   if not writefilename then writefilename=getfilename end
   local ftp=ssap.safeRequire("ftp")
   if not ftp then return false end
   if ftp.connection(server_ip) then
-    local success,code=ftp.request(server_ip,getfilename,writefilename,true)
+    local success,code=ftp.request(server_ip,getfilename,writefilename,true,pretty)
+    if success then return true
+    else
+      ssap.log("Require fail: "..tostring(code),1)
+      return false
+    end
+  else
+    ssap.log("Couldn't establish connection!")
+  end
+end
+function ssap.client.SendFile(server_ip,filename)
+  if not ip.isIPv2(server_ip) then return false end
+  if not filename then return false end
+  local ftp=ssap.safeRequire("ftp")
+  if not ftp then return false end
+  if ftp.connection(server_ip) then
+    local success,code=ftp.upload(server_ip,filename,true)
     if success then return true
     else
       ssap.log("Require fail: "..tostring(code),1)
@@ -318,7 +352,7 @@ m-types:
 (s->c)"keypress_request",{"timeout"=<int>,"only"={{-1,57},{32,57}}},{}
 (c<-s)"keypress_response",{},{<int>,<int>}
 (c<-s)"ftp_file_get",{},{<filename>}
-(c<-s)"ftp_file_upload",{},{<filename>}
+(c<-s)"ftp_file_put",{},{<filename>}
 (s->c)"exit",{},{}
 (s->c)"clear",{bg_color:0x000000},{}
 ]]

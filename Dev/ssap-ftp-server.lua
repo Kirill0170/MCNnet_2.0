@@ -108,7 +108,9 @@ function app.main(to_ip) --will be used for each client
   function sfs.cmd.help()
     local help_message={
       "Current commands are available:",
-      "ls <dir> - get contents of dir"
+      "ls <dir> - get contents of dir",
+      "get <file> - get file",
+      "put <localfile> - put a file to server"
     }
     api.text(help_message)
   end
@@ -175,7 +177,7 @@ function app.main(to_ip) --will be used for each client
             return
           end
         end
-        ssap.server.sendFile(to_ip,file)
+        ssap.server.sendFile(to_ip,file,true)
       else
         api.text(file.." is a direcotry!",styles["error"])
       end
@@ -184,7 +186,7 @@ function app.main(to_ip) --will be used for each client
     end
   end
   function sfs.cmd.put(file)
-    ssap.getFile(to_ip,file)
+    ssap.server.requestFile(to_ip,file)
   end
   -----EDIT HERE YOUR APPLICATION---------
   if config["log"] then print("Application started") end
@@ -199,6 +201,10 @@ function app.main(to_ip) --will be used for each client
   ">>Your current working directory is "..config["directory"]
   }
   api.text(greet_message)
+  styles["rorre"]={}
+  styles["rorre"]["bg_color"]=0xFF0000
+  api.text("fg_debug",styles["error"])
+  api.text("bg_debug",styles["rorre"])
   local pwd=config["directory"]
   while true do --main loop(You don't want your application to finish, right?)
     local str=api.input(60,"[FTP]:"..pwd.." # ")
@@ -212,6 +218,7 @@ function app.main(to_ip) --will be used for each client
       elseif args[1]=="ls" then sfs.cmd.ls(args[2])
       elseif args[1]=="help" then sfs.cmd.help()
       elseif args[1]=="get" then sfs.cmd.get(args[2])
+      elseif args[1]=="put" then sfs.cmd.put(args[2])
       else api.text("No such command!",styles["error"])
       end
     end

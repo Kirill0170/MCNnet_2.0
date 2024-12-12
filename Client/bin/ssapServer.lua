@@ -8,4 +8,5 @@ require("thread").create(cmnp.mncp.c2cPingService):detach()
 if not ssap.server.connectionManager(application) then
     print("Server was stopped")
     cmnp.mncp.stopService()
+    os.sleep(0.2)
 end

@@ -1,4 +1,4 @@
-local ver="1.5"
+local ver="1.5.2"
 local ssap=require("ssap")
 local mnp=require("cmnp")
 local shell=require("shell")
@@ -51,7 +51,7 @@ function connection(to_ip,timeout)
   if domain~="" then print("Connecting to "..domain.."("..to_ip..")")
   else print("Connectiong to "..to_ip) end
   if not ssap.client.connect(to_ip,timeout) then
-    print("Exiting")
+    cprint("Couldn't connect!",0xFF0000)
   else
     local rcode=ssap.client.connection(to_ip,timeout)
     if rcode==0 then
@@ -60,6 +60,8 @@ function connection(to_ip,timeout)
       cprint("Timeouted!",0xFFFF33)
     elseif rcode==2 then
       cprint("Client-side timeout/error",0xFFCC33)
+    elseif rcode==3 then
+      cprint("FTP error!",0xFFCC33)
     else
       print("Unknown return code!",rcode)
     end
