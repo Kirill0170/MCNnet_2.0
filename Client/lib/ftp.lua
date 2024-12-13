@@ -1,9 +1,9 @@
 local mnp=require("cmnp")
 local ip=require("ipv2")
 local ser=require("serialization")
-local version="1.3"
+local version="1.4.2b"
 local ftp={}
-ftp.maxPacketLen=1024
+ftp.maxPacketLen=2048
 function ftp.ver() return version end
 function ftp.checkData(data,filePacket)
   if type(data)~="table" then return false end
@@ -61,6 +61,17 @@ local function padString(input,len)
   end
   return input
 end
+local function splitString(inputString)
+  local result = {}
+  if #inputString > ftp.maxPacketLen then
+    for i = 1, #inputString, ftp.maxPacketLen do
+      table.insert(result, inputString:sub(i, i + ftp.maxPacketLen - 1))
+    end
+  else
+    table.insert(result, inputString)
+  end
+  return result
+end
 local function getPacketLen(packet)
   local len=0
   for i=1,#packet do
@@ -97,9 +108,9 @@ function ftp.get(to_ip,requestFileName,writeFileName,pretty)
         elseif not ftp.checkData(pdata,true) then mnp.log("FTP","Incorrect data packet: "..ser.serialize(pdata),1)
         elseif pdata[1]~="transmissionData" then mnp.log("FTP","Incorrect packet type: "..pdata[1],1)
         else
-          local term=require("term")
           filePackets[pdata[2]["packetNum"]]=pdata[3]
           if pretty then
+            local term=require("term")
             total_size=total_size+getPacketLen(pdata[3])
             local time=math.floor(require("computer").uptime()-start_time)
             local mins=math.floor(time/60)
@@ -130,10 +141,10 @@ function ftp.get(to_ip,requestFileName,writeFileName,pretty)
         mnp.send(to_ip,"ftp",{"transmissionSuccess",{},{}})
       end
       --process file
-      local file=io.open(writeFileName,"w")
+      local file=io.open(writeFileName,"wb")
       for l,line in pairs(filePackets) do
         for i=1,#line do
-          file:write(line[i].."\n")
+          file:write(line[i])
         end
       end
       filePackets=nil
@@ -163,7 +174,7 @@ end
 function ftp.send(to_ip,filename)
   if not ip.isIPv2(to_ip) then return false end
   if not filename then return false end
-  local file=io.open(filename,"r")
+  local file=io.open(filename,"rb")
   if not file then
     mnp.send(to_ip,"ftp",{"transmissionFail",{},{"No such file"}})
     return false
@@ -172,7 +183,7 @@ function ftp.send(to_ip,filename)
   local fileLines={}
   local prev=""
   while prev do
-    prev=file:read("l")
+    prev=file:read(ftp.maxPacketLen)
     if prev then table.insert(fileLines,prev) end
   end
   file:close()

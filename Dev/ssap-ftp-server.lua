@@ -117,37 +117,36 @@ function app.main(to_ip) --will be used for each client
   function sfs.cmd.ls(dir)
     local list={}
     local list_dir=dir
-    if not list_dir or list_dir=="" then list_dir=sfs.pwd
-    else
-      if fs.exists(list_dir) then
-        if fs.isDirectory(list_dir) then
-          if sfs.strict then
-            if not sfs.isSubdir(list_dir) then
-              api.text("You can only work in "..sfs.workdir.." directory.",styles["error"])
-              return
-            end
+    if not list_dir or list_dir=="" then list_dir=sfs.pwd end
+    print(tostring(list_dir))
+    if fs.exists(list_dir) then
+      if fs.isDirectory(list_dir) then
+        if sfs.strict then
+          if not sfs.isSubdir(list_dir) then
+            api.text("You can only work in "..sfs.workdir.." directory.",styles["error"])
+            return
           end
-          for i in fs.list(list_dir) do table.insert(list,i) end
-          local stringlist={}
-          local c=1
-          local str=""
-          for i=1,#list do
-            if c==6 then
-              c=1
-              table.insert(stringlist,str)
-              str=""
-            end
-            c=c+1
-            str=str.." "..list[i]
-          end
-          table.insert(stringlist,str)
-          api.text(stringlist)
-        else
-          api.text("Not a directory: "..list_dir,styles["error"])
         end
+        for i in fs.list(list_dir) do table.insert(list,i) end
+        local stringlist={}
+        local c=1
+        local str=""
+        for i=1,#list do
+          if c==6 then
+            c=1
+            table.insert(stringlist,str)
+            str=""
+          end
+          c=c+1
+          str=str.." "..list[i]
+        end
+        table.insert(stringlist,str)
+        api.text(stringlist)
       else
-        api.text("No such directory: "..list_dir,styles["error"])
+        api.text("Not a directory: "..list_dir,styles["error"])
       end
+    else
+      api.text("No such directory: "..list_dir,styles["error"])
     end
   end
   function sfs.checkDir(dir)
@@ -201,10 +200,6 @@ function app.main(to_ip) --will be used for each client
   ">>Your current working directory is "..config["directory"]
   }
   api.text(greet_message)
-  styles["rorre"]={}
-  styles["rorre"]["bg_color"]=0xFF0000
-  api.text("fg_debug",styles["error"])
-  api.text("bg_debug",styles["rorre"])
   local pwd=config["directory"]
   while true do --main loop(You don't want your application to finish, right?)
     local str=api.input(60,"[FTP]:"..pwd.." # ")
