@@ -7,10 +7,10 @@ Advanced node networking for Open Computers, still under active development.
 * Domain names are NOT written
 * Protocols: MNP, MNCP(pinging), SSAP
 * SSAP servers are working for use
-## Planned:
+* FTP protocol for transmitting files
 * Domain names for servers
+## Planned:
 * Tunnel Nodes for cross-dimentional communication
-* FTP for files
 * UAP for logins
 * (very planned) better website protocol
 
@@ -23,10 +23,9 @@ When trying to connect to specific ip address, mnp search will be run recursivel
 ## DNS
 Servers will be able to have domain names, like "example.com". 
 ## Servers
-Servers are special clients, which can handle connections from different clients. There are different protocols of connecting to server, each designed to accomplish specific tasks.
-## Protocols
-**[SSAP]** - Simple Server Application Protocol, allows simple terminal connection with basic I/O facilities.  
-**[FTP]** - simple File Transfer Protocol connection, however does not support TUI.  
-**[SSAPF]** - SSAP with FTP attached to it, can download and upload files.  
+Servers are clients which are running some application and handle connections from another clients. There are different protocols of connecting to server, each designed to accomplish specific tasks. It is also possible to write your own protocol!
+# Protocols
+**[SSAP]** - (done)Simple Server Application Protocol, allows simple terminal connection with basic I/O facilities.  
+**[FTP]** - (done)simple File Transfer Protocol connection, however does not support TUI.  
 **[SSTP]** - [Planned] Simple Site Transfer Protocol - graphical sites, as we know it.  
 **[UAP]** - Universal Auth Protocol, for managing logins.
