@@ -1,6 +1,6 @@
-local ver="1.5.2"
-local ssap=require("ssap")
+local ver="1.2"
 local mnp=require("cmnp")
+local ftp=require("ftp")
 local shell=require("shell")
 local ip=require("ipv2")
 local component=require("component")
@@ -14,21 +14,21 @@ end
 
 --functions
 local function help()
-  cprint("SSAP client connection",0xFFCC33)
+  cprint("FTP-GET",0xFFCC33)
   print("Version "..ver)
-  print("SSAP version: "..ssap.ver())
-  print("About: simple SSAP conenction client")
-  cprint("Usage: client <options> server_ip",0x6699FF)
-  cprint("Options:",0x33CC33)
-  print("--t=<int>      Timeout time")
+  print("FTP version: "..ftp.ver())
+  print("About: simple FTP get file")
+  cprint("Usage: ftp-get server_ip/hostname file-to-get file-to-write",0x6699FF)
+  print("Examples:")
+  print("ftp-get 12ab:34cd /home/file.txt")
+  print("ftp-get example.com /etc/about.txt /home/downloaded.txt")
 end
 
-function connection(to_ip,timeout)
+local function connection(to_ip,filename,writefilename)
   if not mnp.isConnected() then cprint("You should be connected to network",0xFF0000) return false end
-  if timeout then
-    if not tonumber(timeout) then cprint("--t should be given a number, defaulting to 10",0xFFCC33) timeout=10 
-    else timeout=tonumber(timeout) end
-  else timeout=10 end
+  if not filename then cprint("What file to get?",0xFF0000) return false end
+  if not writefilename then writefilename=filename end
+  --check destination
   local domain=""
   if mnp.checkHostname(to_ip) then
     domain=to_ip
@@ -48,22 +48,15 @@ function connection(to_ip,timeout)
     end
   end
   if not mnp.getSavedRoute(to_ip) then cprint("Couldn't get route for "..to_ip,2) return false end
-  if domain~="" then print("Connecting to "..domain.."("..to_ip..")")
-  else print("Connectiong to "..to_ip) end
-  if not ssap.client.connect(to_ip,timeout) then
-    cprint("Couldn't connect!",0xFF0000)
+  --main
+  if not ftp.connection(to_ip) then
+    cprint("Couldn't connect to "..to_ip,0xFF0000)
   else
-    local rcode=ssap.client.connection(to_ip,timeout)
-    if rcode==0 then
-      print("Closed connection to "..to_ip)
-    elseif rcode==1 then
-      cprint("Timeouted!",0xFFFF33)
-    elseif rcode==2 then
-      cprint("Client-side timeout/error",0xFFCC33)
-    elseif rcode==3 then
-      cprint("FTP error!",0xFFCC33)
+    local success,err=ftp.request(to_ip,filename,writefilename,true,true)
+    if not success then
+      cprint("Couldn't get file: "..tostring(err),0xFF0000)
     else
-      print("Unknown return code!",rcode)
+      print("File saved to "..writefilename)
     end
   end
 end
@@ -71,6 +64,5 @@ end
 local args,ops = shell.parse(...)
 if not args and not ops then help()
 elseif ops["h"] or ops["help"] then help()
-elseif ip.isIPv2(args[1]) or mnp.checkHostname(args[1]) then connection(args[1],ops["t"])
+elseif ip.isIPv2(args[1]) or mnp.checkHostname(args[1]) then connection(args[1],args[2],args[3])
 else help() end
---TODO: VERSION CHECKING

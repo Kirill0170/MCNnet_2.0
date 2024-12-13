@@ -53,10 +53,11 @@ function app.main(to_ip) --will be used for each client
       options["x"]=tonumber(position[1])
       options["y"]=tonumber(position[2])
     end
-    ssap.send(to_ip,{"text",options,{text}})
+    if type(text)=="string" then text={text} end
+    ssap.send(to_ip,{"text",options,text})
   end
   function api.input(timeoutTime,label)
-    local result=ssap.getInput(to_ip,timeoutTime,label)
+    local result=ssap.server.getInput(to_ip,timeoutTime,label)
     if not result then --handle timeout
       if config["log"] then print("Timeouted during input") end
       ssap.disconnect(to_ip)
@@ -65,7 +66,7 @@ function app.main(to_ip) --will be used for each client
     return result
   end
   function api.keyPress(timeoutTime,only)
-    local result=ssap.getKeyPress(to_ip,timeoutTime,only)
+    local result=ssap.server.getKeyPress(to_ip,timeoutTime,only)
     if not result then --handle timeout
       if config["log"] then print("Timeouted during keypress") end
       ssap.disconnect(to_ip)

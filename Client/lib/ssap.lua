@@ -1,5 +1,4 @@
-local version="1.4 beta"
-local dolog=true
+local version="1.6.1"
 local component=require("component")
 local computer=require("computer")
 local ser=require("serialization")
@@ -9,24 +8,141 @@ local ip=require("ipv2")
 local gpu=component.gpu
 local cmnp=require("cmnp")
 local term=require("term")
-local ports={}
-ports["ssap_conn"]=2000
-ports["ssap_data"]=2001
 local ssap={}
 ssap.client={}
---Util-
+ssap.server={}
+--Util-----------------------
 function ssap.log(text,crit)
   cmnp.log("SSAP",text,crit)
 end
-function ssap.getVersion() return version end
---Main--
+function ssap.safeRequire(modname)
+  if not modname then return nil end
+  local success,module=pcall(function ()
+    return require(modname)
+  end)
+  if success then return module
+  else ssap.log("Couldn't require "..modname..": "..module,2) return nil end
+end
 function ssap.checkData(data) --{"packet_type",{options},{data}}
   if type(data)~="table" then return false end
   if type(data[1])~="string" then return false end
   if type(data[2])~="table" or type(data[3])~="table" then return false end
   return true
 end
-function ssap.clientConnect(to_ip,timeoutTime)--REDO AND FIX ISSUES
+function ssap.ver() return version end
+--Main------------------------
+function ssap.server.connectionManager(filename) --no UAP support
+  local fs=require("filesystem")
+  if not fs.exists("/lib/"..filename..".lua") then
+    ssap.log("Couldn't start SSAP CM: no such file: "..filename,2)
+    return false
+  end
+  if not cmnp.isConnected() then ssap.log("Couldn't start SSAP CM: not connected",2) return false end
+  --DEBUG
+  cmnp.toggleLog(true)
+  --listener
+  local stopEvent="ssapListenerStop"
+  local dataEvent="ssapListenerData"
+  thread.create(cmnp.listen,"broadcast","ssap",stopEvent,dataEvent):detach()
+  ssap.log("Started SSAP Connection Manager")
+  ssap.log("Press space to check status")
+  local sessions={}
+  require(filename).setup()
+  while true do
+    local id,data,from_ip,key=event.pullMultiple(dataEvent,"interrupted","ssap_stopCM","key_down")
+    if id=="interrupted" then
+      ssap.log("CM stopped",2)
+      require(filename).shutdown()
+      computer.pushSignal(stopEvent)
+      break 
+    elseif id=="ssap_stopCM" then
+      ssap.log("Stopping Connection Manager")
+      computer.pushSignal(stopEvent)
+      break
+    elseif id=="key_down" then
+      if key==57 then
+        ssap.log("IP: "..os.getenv("this_ip"))
+        local percentage=tonumber((computer.totalMemory()-computer.freeMemory())/computer.totalMemory())*100
+        ssap.log("Memory usage: "..string.format("%.0f%%",percentage))
+        ssap.log("Free memory:"..computer.freeMemory().."/"..computer.totalMemory())
+        ssap.log("Current sessions:")
+        for s_ip,t in pairs(sessions) do
+          ssap.log(s_ip.." "..t:status())
+        end
+      end
+    else
+      data=ser.unserialize(data)
+      if data[1]=="init" then
+        local rdata={}
+        rdata[1]="init"
+        rdata[2]={}
+        rdata[2]["uap"]=false --UAP
+        local to_ip=from_ip
+        if data[2]["version"]==version then
+          rdata[3]={"OK",""}
+          cmnp.send(to_ip,"ssap",rdata)
+          --wait for client start
+          local check_data=cmnp.receive(to_ip,"ssap",10)
+          if not check_data or check_data[1]~="start" then ssap.log("Client didn't start app",1)
+          else
+            --check if already started thread
+            if sessions[to_ip] then sessions[to_ip]:kill() end
+            local t=thread.create(ssap.server.application,filename,to_ip):detach()
+            sessions[to_ip]=t
+          end
+        else
+          rdata[3]={"CR","Different SSAP version! Expected: <"..version.."> Got: <"..tostring(rdata[2]["version"]..">")}
+          cmnp.send(to_ip,"ssap",rdata)
+        end
+      end
+    end
+  end
+end
+function ssap.server.application(filepath,to_ip)
+  if not require("filesystem").exists("/lib/"..filepath..".lua") then
+    ssap.log("Could not open application file",3)
+  end
+  local app=require(filepath)
+  ssap.log("Starting SSAP application...")
+  app.main(to_ip)
+end
+function ssap.send(to_ip,data)
+  cmnp.send(to_ip,"ssap",data)
+end
+function ssap.server.getInput(from_ip,timeoutTime,label)--REDO THIS USING DEDICATED INPUT
+  if not ip.isIPv2(from_ip) then return nil end
+  if not tonumber(timeoutTime) then timeoutTime=120 end
+  local sdata={"input_request",{},{}}
+  if label then sdata[2]["label"]=label end
+  sdata[2]["timeout"]=timeoutTime
+  cmnp.send(from_ip,"ssap",sdata)
+  --no local
+  local rdata=cmnp.receive(from_ip,"ssap",timeoutTime)
+  if rdata[1]=="input_response" and rdata[3][1]~=nil then
+    return rdata[3][1]
+  end
+  return nil
+end
+function ssap.server.getKeyPress(from_ip,timeoutTime,only)
+  if not ip.isIPv2(from_ip) then return nil end
+  if not tonumber(timeoutTime) then timeoutTime=120 end
+  local sdata={"keypress_request",{},{}}
+  sdata[2]["timeout"]=timeoutTime
+  if type(only)=="table" then
+    sdata[2]["only"]=only
+  end
+  cmnp.send(from_ip,"ssap",sdata)
+  --no local
+  local rdata=cmnp.receive(from_ip,"ssap",timeoutTime)
+  if rdata[1]=="keypress_response" and type(rdata[3])=="table" then
+    return rdata[3]
+  end
+  return nil
+end
+function ssap.disconnect(to_ip)
+  cmnp.send(to_ip,"ssap",{"exit",{},{}})
+end
+function ssap.client.connect(to_ip,timeoutTime)
   if not ip.isIPv2(to_ip) then return false end
   if not cmnp.isConnected() then return false end
   if not timeoutTime then timeoutTime=10 end --ssap connection should be fast
@@ -58,124 +174,12 @@ function ssap.clientConnect(to_ip,timeoutTime)--REDO AND FIX ISSUES
       cmnp.send(to_ip,"ssap",{"start"})--start
       return true
     elseif rdata[3][1]=="CR" then
-      ssap.log("Connection refused",1)
+      ssap.log("Connection refused: "..tostring(rdata[3][2]),1)
       return false
     end
   end
   ssap.log("Could not connect to server: wrong packet!",1)
   return false
-end
-function ssap.serverConnectionManager(filename) --no UAP support
-  local fs=require("filesystem")
-  if not fs.exists("/lib/"..filename..".lua") then
-    ssap.log("Couldn't start SSAP CM: no such file: "..filename,2)
-    return false
-  end
-  if not cmnp.isConnected() then ssap.log("Couldn't start SSAP CM: not connected",2) return false end
-  --DEBUG
-  cmnp.toggleLog(true)
-  --listener
-  local stopEvent="ssapListenerStop"
-  local dataEvent="ssapListenerData"
-  thread.create(cmnp.listen,"broadcast","ssap",stopEvent,dataEvent):detach()
-  ssap.log("Started SSAP Connection Manager")
-  ssap.log("Press space to check current client sessions")
-  local sessions={}
-  require(filename).setup()
-  while true do
-    local id,data,np,key=event.pullMultiple(dataEvent,"interrupted","ssap_stopCM","key_down")
-    if id=="interrupted" then
-      ssap.log("CM stopped",2)
-      require(filename).shutdown()
-      computer.pushSignal(stopEvent)
-      break 
-    elseif id=="ssap_stopCM" then
-      ssap.log("Stopping Connection Manager")
-      computer.pushSignal(stopEvent)
-      break
-    elseif id=="key_down" then
-      if key==57 then
-        ssap.log("IP: "..os.getenv("this_ip"))
-        local percentage=tonumber((computer.totalMemory()-computer.freeMemory())/computer.totalMemory())*100
-        ssap.log("Memory usage: "..string.format("%.0f%%",percentage))
-        ssap.log("Free memory:"..computer.freeMemory().."/"..computer.totalMemory())
-        ssap.log("Current sessions:")
-        for to_ip,t in pairs(sessions) do
-          ssap.log(to_ip.." "..t:status())
-        end
-      end
-    else
-      data=ser.unserialize(data)
-      np=ser.unserialize(np)
-      if data[1]=="init" then
-        local rdata={}
-        rdata[1]="init"
-        rdata[2]={}
-        rdata[2]["uap"]=false --UAP
-        local to_ip=np["route"][0]
-        if data[2]["version"]==version then
-          rdata[3]={"OK",""}
-          cmnp.sendBack("ssap",np,rdata)
-          --wait for client start
-          local check_data=cmnp.receive(to_ip,"ssap",10)
-          if not check_data or check_data[1]~="start" then ssap.log("Client didn't start app",1)
-          else
-            --check if already started thread
-            if sessions[to_ip] then sessions[to_ip]:kill() end
-            local t=thread.create(ssap.application,filename,to_ip):detach()
-            sessions[to_ip]=t
-          end
-        else
-          rdata[3]={"CR","Different SSAP version!"}
-          cmnp.sendBack("ssap",np,rdata)
-        end
-      end
-    end
-  end
-end
-function ssap.application(filepath,to_ip)
-  if not require("filesystem").exists("/lib/"..filepath..".lua") then
-    ssap.log("Could not open application file",3)
-  end
-  local app=require(filepath)
-  ssap.log("Starting SSAP application...")
-  app.main(to_ip)
-end
-function ssap.send(to_ip,data)
-  cmnp.send(to_ip,"ssap",data)
-end
-function ssap.getInput(from_ip,timeoutTime,label)--REDO THIS USING DEDICATED INPUT
-  if not ip.isIPv2(from_ip) then return nil end
-  if not tonumber(timeoutTime) then timeoutTime=120 end
-  local sdata={"input_request",{},{}}
-  if label then sdata[2]["label"]=label end
-  sdata[2]["timeout"]=timeoutTime
-  cmnp.send(from_ip,"ssap",sdata)
-  --no local
-  local rdata=cmnp.receive(from_ip,"ssap",timeoutTime)
-  if rdata[1]=="input_response" and rdata[3][1]~=nil then
-    return rdata[3][1]
-  end
-  return nil
-end
-function ssap.getKeyPress(from_ip,timeoutTime,only)
-  if not ip.isIPv2(from_ip) then return nil end
-  if not tonumber(timeoutTime) then timeoutTime=120 end
-  local sdata={"keypress_request",{},{}}
-  sdata[2]["timeout"]=timeoutTime
-  if type(only)=="table" then
-    sdata[2]["only"]=only
-  end
-  cmnp.send(from_ip,"ssap",sdata)
-  --no local
-  local rdata=cmnp.receive(from_ip,"ssap",timeoutTime)
-  if rdata[1]=="keypress_response" and type(rdata[3])=="table" then
-    return rdata[3]
-  end
-  return nil
-end
-function ssap.disconnect(to_ip)
-  cmnp.send(to_ip,"ssap",{"exit",{},{}})
 end
 function ssap.client.text(options,text)
   local prev_bg_color=gpu.getBackground()
@@ -185,7 +189,7 @@ function ssap.client.text(options,text)
   local x=tonumber(options["x"])
   local y=tonumber(options["y"])
   if bg_color then gpu.setBackground(bg_color) end
-  if options["fg_color"] then gpu.setBackground(fg_color) end
+  if fg_color then gpu.setForeground(fg_color) end
   if x and y then
     term.setCursor(x,y)
     term.write(text[1])
@@ -243,7 +247,7 @@ function ssap.client.keyPress(server_ip,options) --options["only"]={57,...}
   cmnp.send(server_ip,"ssap",sdata)
   return true
 end
-function ssap.clientConnection(server_ip,timeoutTime)--REDO THIS USING DEDICATED INPUT
+function ssap.client.connection(server_ip,timeoutTime)--REDO THIS USING DEDICATED INPUT
   --0: disconnected 1: server timeout 2: client timeout
   if not tonumber(timeoutTime) then timeoutTime=30 end
   while true do
@@ -260,11 +264,76 @@ function ssap.clientConnection(server_ip,timeoutTime)--REDO THIS USING DEDICATED
       if not ssap.client.input(server_ip,rdata[2]) then return 2 end
     elseif rdata[1]=="keypress_request" then
       if not ssap.client.keyPress(server_ip,rdata[2]) then return 2 end
+    elseif rdata[1]=="ftp_file_get" then
+      if not ssap.client.GetFile(server_ip,rdata[3][1],rdata[3][1],rdata[3][2]) then return 3 end
+    elseif rdata[1]=="ftp_file_put" then
+      if not ssap.client.SendFile(server_ip,rdata[3][1]) then return 3 end
     elseif rdata[1]=="clear" then
       term.clear()
     else
       ssap.log("Unknown ssap header: "..tostring(rdata[1]),1)
     end
+  end
+end
+--FTP------------------------------------------
+function ssap.server.sendFile(to_ip,filename,clientPretty)
+  if not ip.isIPv2(to_ip) then return false end
+  if not filename then return false end
+  if not clientPretty then clientPretty=false end
+  local ftp=ssap.safeRequire("ftp")
+  if not ftp then return false
+  else
+    ssap.send(to_ip,{"ftp_file_get",{},{filename,clientPretty}})
+    if not ftp.serverConnectionAwait(to_ip,30) then
+    else
+      ftp.serverConnection(to_ip,filename)
+    end
+  end
+end
+function ssap.server.requestFile(to_ip,filename)
+  if not ip.isIPv2(to_ip) then return false end
+  if not filename then return false end
+  local ftp=ssap.safeRequire("ftp")
+  if not ftp then return false
+  else
+    ssap.send(to_ip,{"ftp_file_put",{},{filename}})
+    if not ftp.serverConnectionAwait(to_ip,30) then
+    else
+      ftp.serverConnection(to_ip,filename)
+    end
+  end
+end
+function ssap.client.GetFile(server_ip,getfilename,writefilename,pretty)
+  if not ip.isIPv2(server_ip) then return false end
+  if not getfilename then return false end
+  if not writefilename then writefilename=getfilename end
+  local ftp=ssap.safeRequire("ftp")
+  if not ftp then return false end
+  if ftp.connection(server_ip) then
+    local success,code=ftp.request(server_ip,getfilename,writefilename,true,pretty)
+    if success then return true
+    else
+      ssap.log("Require fail: "..tostring(code),1)
+      return false
+    end
+  else
+    ssap.log("Couldn't establish connection!")
+  end
+end
+function ssap.client.SendFile(server_ip,filename)
+  if not ip.isIPv2(server_ip) then return false end
+  if not filename then return false end
+  local ftp=ssap.safeRequire("ftp")
+  if not ftp then return false end
+  if ftp.connection(server_ip) then
+    local success,code=ftp.upload(server_ip,filename,true)
+    if success then return true
+    else
+      ssap.log("Require fail: "..tostring(code),1)
+      return false
+    end
+  else
+    ssap.log("Couldn't establish connection!")
   end
 end
 return ssap
@@ -282,6 +351,8 @@ m-types:
 (s<-c)"input_response",{},{"<input>"}
 (s->c)"keypress_request",{"timeout"=<int>,"only"={{-1,57},{32,57}}},{}
 (c<-s)"keypress_response",{},{<int>,<int>}
+(c<-s)"ftp_file_get",{},{<filename>}
+(c<-s)"ftp_file_put",{},{<filename>}
 (s->c)"exit",{},{}
 (s->c)"clear",{bg_color:0x000000},{}
 ]]
