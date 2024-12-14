@@ -1,5 +1,5 @@
 --MNP CONNECTION MANAGER for client
-local ver="ALPHA 0.9.52"
+local ver="ALPHA 0.9.6"
 local filename="/usr/.cm_last_netname"
 local mnp=require("cmnp")
 local ip=require("ipv2")
@@ -137,6 +137,7 @@ local function connect(name)
   if not address then
     cprint("Saved node addresses not found. Use 'cm netsearch' to search for networks",0xFFCC33)
     return false end
+  if mnp.isConnected() then mnp.disconnect() end
   print("Trying to connect to "..name)
   savePrevName(name)
   if mnp.networkConnectByName(address,name) then print("Connected successfully")
@@ -254,7 +255,7 @@ elseif args[1]=="netsearch" or args[1]=="ns" then search(ops["s"],ops["p"])
 elseif args[1]=="nping" or args[1]=="np" then pingNode(ops["n"],ops["t"])
 elseif args[1]=="c2cping" then c2cping(ops["n"],ops["t"],args[2])
 elseif args[1]=="connect" or args[1]=="c" then connect(args[2])
-elseif args[1]=="reconnect" or args[1]=="np" then reconnect()
+elseif args[1]=="reconnect" or args[1]=="rc" then reconnect()
 elseif args[1]=="reset" then reset()
 elseif args[1]=="help" then help()
 elseif args[1]=="ver" then versions()
