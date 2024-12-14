@@ -1,5 +1,5 @@
 --MNP CONNECTION MANAGER for client
-local ver="ALPHA 0.9.4"
+local ver="ALPHA 0.9.5"
 local filename="/usr/.cm_last_netname"
 local mnp=require("cmnp")
 local ip=require("ipv2")
@@ -20,17 +20,21 @@ local function help()
   print("Version "..ver)
   cprint("Usage: cm [action] <options>",0x6699FF)
   cprint("Actions:",0x33CC33)
-  print("ver                  version info")
-  print("help                 show this message")
-  print("netsearch            search for networks")
-  print("connect <name>       connect to network by name;")
-  print("                        should have connected to this network previously")
-  print("                        use 'cm connect' to connect to previous network")
-  print("status               current connection status")
-  print("disconnect           disconnect from network ")
-  print("reconnect            disconnect & connect")
-  print("nping <n> <t>        ping node")
-  print("c2cping <n> <t> [ip] Client-to-Client pinging")
+  local help_cmds=[[
+    ver                   version info
+    help                  show this message
+    netsearch (ns)        search for networks
+    connect <name>        connect to network by name;
+                              should have connected to this network previously
+                              use 'cm connect' to connect to previous network
+    status (s)            current connection status
+    disconnect (d)        disconnect from network
+    reconnect  (rc)       disconnect & connect
+    nping <n> <t>        ping node
+    c2cping <n> <t> [ip] Client-to-Client pinging
+    reset                reset all saved MNP data
+  ]]
+  print(help_cmds)
   cprint("Options:",0x33CC33)
   print("-s             Silence logs")
   print("-p             Print logs")
@@ -49,23 +53,10 @@ local function status()
     return false
   end
   print("This computer's IP is: "..this_ip)
-  if this_ip=="" or not require("ipv2").isIPv2(this_ip) then
-    cprint("Not an IP - How did this happen?",0xFFCC33)
-  elseif this_ip=="0000:0000" then
-    cprint("Registration was aborted - try again.",0xFF0000)
+  if mnp.isConnected(true) then
+    cprint("Connected!",0x33CC33)
   else
-    cprint("Ip is valid",0x33CC33)
-    local node_uuid=os.getenv("node_uuid")
-    if not require("ipv2").isUUID(node_uuid) then
-      cprint("Node uuid failure",0xFF0000)
-      return false
-    end
-    if string.match(string.sub(node_uuid,1,4),string.sub(this_ip,1,4)) then
-      cprint("Node UUID matches, should be connected (try pinging)",0x33CC33)
-      return true
-    end
-    cprint("Node UUID doesn't match IP - Reconnect required",0xFF0000)
-    return false
+    cprint("Not connected.",0xFF0000)
   end
 end
 
@@ -138,13 +129,13 @@ local function connect(name)
   if not name then--check previous name
     name=loadPrevName()
     if not name then
-      cprint("You haven't connected before. Use 'cm search' to search for networks",0xFFCC33)
+      cprint("You haven't connected before. Use 'cm netsearch' to search for networks",0xFFCC33)
       return false
     end
   end
   local address=mnp.getSavedNode(name)
-  if not address then 
-    cprint("Saved node addresses not found. Use 'cm search' to search for networks",0xFFCC33)
+  if not address then
+    cprint("Saved node addresses not found. Use 'cm netsearch' to search for networks",0xFFCC33)
     return false end
   print("Trying to connect to "..name)
   savePrevName(name)
@@ -228,6 +219,18 @@ local function c2cping(n,t,to_ip)
     print("     max: "..max.."s min: "..min.."s avg: "..avg.."s")
   end
 end
+local function reset()
+  cprint("Are you sure you want to reset MNP? (cannot be undone)",0xFFCC33)
+  term.write("[y/N]: ")
+  local chk=io.read()
+  if chk=="y" or chk=="Y" then
+    print("Resetting!")
+    disconnect()
+    os.remove("/etc/mnpSavedNetworks.st")
+    os.remove("/etc/mnpSavedRoutes.st")
+    os.remove("/etc/mnpSavedDomains.st")
+  end
+end
 --main
 local args,ops = shell.parse(...)
 if not args and not ops then help()
@@ -246,14 +249,15 @@ if ops["n"] then
 else ops["n"]=10 end
 
 if args[1]=="disconnect" then disconnect()
-elseif args[1]=="status" then status()
-elseif args[1]=="netsearch" then search(ops["s"],ops["p"])
-elseif args[1]=="nping" then pingNode(ops["n"],ops["t"])
+elseif args[1]=="status" or args[1]=="s" then status()
+elseif args[1]=="netsearch" or args[1]=="ns" then search(ops["s"],ops["p"])
+elseif args[1]=="nping" or args[1]=="np" then pingNode(ops["n"],ops["t"])
 elseif args[1]=="c2cping" then c2cping(ops["n"],ops["t"],args[2])
-elseif args[1]=="connect" then connect(args[2])
-elseif args[1]=="reconnect" then reconnect()
+elseif args[1]=="connect" or args[1]=="c" then connect(args[2])
+elseif args[1]=="reconnect" or args[1]=="np" then reconnect()
+elseif args[1]=="reset" then reset()
 elseif args[1]=="help" then help()
 elseif args[1]=="ver" then versions()
-else help() end 
+else help() end
 --idea: networks: just display netnames to connect to
 --todo: clear_routes
