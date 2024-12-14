@@ -1,4 +1,4 @@
-local version="1.6.1"
+local version="1.7"
 local component=require("component")
 local computer=require("computer")
 local ser=require("serialization")
@@ -258,16 +258,21 @@ function ssap.client.connection(server_ip,timeoutTime)--REDO THIS USING DEDICATE
     end
     if rdata[1]=="exit" then
       ssap.log("Disconnected: exit")
+      computer.pushSignal("ssaplistenstop")
       return 0
     elseif rdata[1]=="text" then ssap.client.text(rdata[2],rdata[3])
     elseif rdata[1]=="input_request" then
-      if not ssap.client.input(server_ip,rdata[2]) then return 2 end
+      if not ssap.client.input(server_ip,rdata[2]) then computer.pushSignal("ssaplistenstop") return 2 end
     elseif rdata[1]=="keypress_request" then
-      if not ssap.client.keyPress(server_ip,rdata[2]) then return 2 end
+      if not ssap.client.keyPress(server_ip,rdata[2]) then computer.pushSignal("ssaplistenstop") return 2 end
     elseif rdata[1]=="ftp_file_get" then
-      if not ssap.client.GetFile(server_ip,rdata[3][1],rdata[3][1],rdata[3][2]) then return 3 end
+      if not ssap.client.GetFile(server_ip,rdata[3][1],rdata[3][1],rdata[3][2]) then computer.pushSignal("ssaplistenstop") return 3 end
     elseif rdata[1]=="ftp_file_put" then
-      if not ssap.client.SendFile(server_ip,rdata[3][1]) then return 3 end
+      if not ssap.client.SendFile(server_ip,rdata[3][1]) then computer.pushSignal("ssaplistenstop") return 3 end
+    elseif rdata[1]=="text_listen" then
+      thread.create(ssap.client.textlistener,server_ip):detach()
+    elseif rdata[1]=="text_stop" then
+      computer.pushSignal("ssaplistenstop")
     elseif rdata[1]=="clear" then
       term.clear()
     else
@@ -335,6 +340,35 @@ function ssap.client.SendFile(server_ip,filename)
   else
     ssap.log("Couldn't establish connection!")
   end
+end
+function ssap.client.textlistener(server_ip,stopEvent)
+  if not ip.isIPv2(server_ip) then return false end
+  if not stopEvent then stopEvent="ssaplistenstop" end
+  require("thread").create(cmnp.listen,server_ip,"ssap",stopEvent,"ssaplistendata"):detach()
+  while true do
+    local id,data,from_ip=event.pullMultiple("ssaplistendata","interrupted",stopEvent)
+    if id=="interrupted" then
+      computer.pushSignal(stopEvent)
+      break
+    elseif id==stopEvent then break
+    else
+      if from_ip~=server_ip then ssap.log("Wrong ip: "..from_ip,2) end
+      data=ser.unserialize(data)
+      if ssap.checkData(data) then
+        if data[1]=="text" then
+          if data[2]["listener"]==true then
+            ssap.client.text(data[2],data[3])
+          end
+        end
+      end
+    end
+  end
+end
+function ssap.server.textlisten(client_ip)
+  ssap.send(client_ip,{"text_listen",{},{}})
+end
+function ssap.server.textstop(client_ip)
+  ssap.send(client_ip,{"text_stop",{},{}})
 end
 return ssap
 --[[ ssap PROTOCOL (refer to .ssap_protocol)
