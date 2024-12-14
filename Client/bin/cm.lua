@@ -1,5 +1,5 @@
 --MNP CONNECTION MANAGER for client
-local ver="ALPHA 0.9.5"
+local ver="ALPHA 0.9.52"
 local filename="/usr/.cm_last_netname"
 local mnp=require("cmnp")
 local ip=require("ipv2")
@@ -21,18 +21,18 @@ local function help()
   cprint("Usage: cm [action] <options>",0x6699FF)
   cprint("Actions:",0x33CC33)
   local help_cmds=[[
-    ver                   version info
-    help                  show this message
-    netsearch (ns)        search for networks
-    connect <name>        connect to network by name;
-                              should have connected to this network previously
-                              use 'cm connect' to connect to previous network
-    status (s)            current connection status
-    disconnect (d)        disconnect from network
-    reconnect  (rc)       disconnect & connect
-    nping <n> <t>        ping node
-    c2cping <n> <t> [ip] Client-to-Client pinging
-    reset                reset all saved MNP data
+ver                   version info
+help                  show this message
+netsearch (ns)        search for networks
+connect <name>        connect to network by name;
+                          should have connected to this network previously
+                          use 'cm connect' to connect to previous network
+status (s)            current connection status
+disconnect (d)        disconnect from network
+reconnect  (rc)       disconnect & connect
+nping <n> <t>        ping node
+c2cping <n> <t> [ip] Client-to-Client pinging
+reset                reset all saved MNP data
   ]]
   print(help_cmds)
   cprint("Options:",0x33CC33)
@@ -248,7 +248,7 @@ if ops["n"] then
   ops["n"]=tonumber(ops["n"])
 else ops["n"]=10 end
 
-if args[1]=="disconnect" then disconnect()
+if args[1]=="disconnect" or args[1]=="d" then disconnect()
 elseif args[1]=="status" or args[1]=="s" then status()
 elseif args[1]=="netsearch" or args[1]=="ns" then search(ops["s"],ops["p"])
 elseif args[1]=="nping" or args[1]=="np" then pingNode(ops["n"],ops["t"])
