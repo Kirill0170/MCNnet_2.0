@@ -14,7 +14,7 @@ local event=require("event")
 local ip=require("ipv2")
 local gpu=component.gpu
 local mnp_ver="2.5.2 BETA"
-local mncp_ver="2.4.1 INDEV"
+local mncp_ver="2.4.2 INDEV"
 local forbidden_vers={}
 forbidden_vers["mnp"]={"2.21 EXPERIMENTAL"}
 forbidden_vers["mncp"]={"2.1 EXPERIMENTAL"}
@@ -375,7 +375,7 @@ function mnp.isConnected(ping)
   if ip.isUUID(os.getenv("node_uuid")) and ip.isIPv2(os.getenv("this_ip")) then
     if os.getenv("this_ip")=="0000:0000" then return false end
     if ping then
-      if not mnp.mncp_nodePing(1) then return false end
+      if not mnp.mncp.nodePing(1) then return false end
       return true
     end
     return true
