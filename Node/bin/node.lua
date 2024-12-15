@@ -1,5 +1,5 @@
 --Node (beta)
-local node_ver="[beta2 build4]"
+local node_ver="[beta2 build6]"
 local configFile="nodeconfig"
 local component=require("component")
 local computer=require("computer")
@@ -8,7 +8,6 @@ if not component.isAvailable("modem") then error("You gonna need a modem.") end
 local modem=component.modem
 local thread=require("thread")
 local event=require("event")
-local gpu=component.gpu
 local mnp=require("mnp")
 local netpacket=require("netpacket")
 local ip=require("ipv2")
@@ -17,14 +16,14 @@ ThreadStatus={}
 local function packetThread(thread_id)
   local run=true
   mnp.log("Worker"..thread_id,"Online")
-  while run do 
+  while run do
     local id,from,port,mtype,np,data=event.pullMultiple("packet"..thread_id,"stop"..thread_id)
     if id=="stop"..thread_id then run=false break end
     ThreadStatus[thread_id]="busy"
     if not np then mnp.log("NODE","No packet info received") return false end
     np=ser.unserialize(np)
     if data then data=ser.unserialize(data) end
-    if not netpacket.checkPacket(np) then 
+    if not netpacket.checkPacket(np) then
       mnp.log("NODE","Incorrect packet received",1)
       return false 
     end
@@ -39,7 +38,7 @@ local function packetThread(thread_id)
     elseif mtype=="mncp_ping" then
       mnp.mncp.nodePing(from)
     elseif mtype=="setdomain" then
-      mnp.setDomain(np,data[1])
+      mnp.setDomain(np,data)
     else --data
       mnp.pass(port,mtype,np,data)
     end
@@ -48,9 +47,9 @@ local function packetThread(thread_id)
   mnp.log("Worker"..thread_id,"Offline")
 end
 local function checkDeadThreads()
-  c=0
-  for _,thread in pairs(Threads) do
-    if thread:status()=="dead" then c=c+1 end
+  local c=0
+  for _,t in pairs(Threads) do
+    if t:status()=="dead" then c=c+1 end
   end
   return c
 end
@@ -60,7 +59,7 @@ print("---------------------------")
 mnp.log("NODE","Node "..node_ver.." Starting - Hello World!")
 mnp.log("NODE","Reading config")
 local config={}
-if not require("filesystem").exists("/lib/"..configFile..".lua") then 
+if not require("filesystem").exists("/lib/"..configFile..".lua") then
   mnp.log("NODE","Couldn't open config file",1)
   mnp.log("NODE","Continuing with default args: Internet 10 true true true",1)
   config.netName="Internet"
@@ -114,7 +113,11 @@ while true do
     for n_ip,_ in pairs(nips) do
       local node_ip,client_ip=ip.getParts(n_ip)
       if client_ip=="0000" then mnp.log("NODE","  Node "..n_ip)
-      else mnp.log("NODE","  Client "..n_ip) end
+      else
+        local domain=""
+        if mnp.domains[n_ip] then domain=mnp.domains[n_ip] end
+        mnp.log("NODE","  Client "..n_ip.." "..domain)
+      end
     end
     mnp.log("NODE","--Worker-Threads---------")
     local deads=checkDeadThreads()
