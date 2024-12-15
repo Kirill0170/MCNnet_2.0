@@ -11,7 +11,7 @@
 local config={}
 config["name"]="flies-server" --your application name
 config["log"]=true --log stuff
-config["directory"]="/home/share/"
+config["directory"]="/home/"
 config["strict"]=true
 
 local styles={} -- configure styles here
@@ -138,7 +138,7 @@ function app.main(to_ip) --will be used for each client
             str=""
           end
           c=c+1
-          str=str.." "..list[i]
+          str=str.."  "..list[i]
         end
         table.insert(stringlist,str)
         api.text(stringlist)
@@ -168,6 +168,9 @@ function app.main(to_ip) --will be used for each client
     return false
   end
   function sfs.cmd.get(file)
+    if string.sub(file,1,1)~="/" then
+      file=sfs.pwd+file
+    end
     if fs.exists(file) then
       if fs.isDirectory(file)==false then
         if sfs.strict then
