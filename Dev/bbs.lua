@@ -6,7 +6,7 @@
 local config={}
 config["name"]="BBS" --your application name
 config["log"]=true --log stuff
-config["ver"]="1.0.3"
+config["ver"]="1.0.4"
 config["sysopPasswd"]="admin" --ADMINISTRATOR PASSWORD
 config["sysopMOTD"]={"Welcome to the "..config["name"].." BBS!","Second line"}
 config["dbFilename"]="/home/bbs.db"
@@ -194,19 +194,38 @@ function app.main(to_ip)
   bbs.msg={}
   bbs.util={}
   bbs.admin={}
+  bbs.keyNumbers={}
+  bbs.keyNumbers[0]={48,11}
+  bbs.keyNumbers[1]={49,2}
+  bbs.keyNumbers[2]={50,3}
+  bbs.keyNumbers[3]={51,4}
+  bbs.keyNumbers[4]={52,5}
+  bbs.keyNumbers[5]={53,6}
+  bbs.keyNumbers[6]={54,7}
+  bbs.keyNumbers[7]={55,8}
+  bbs.keyNumbers[8]={56,9}
+  bbs.keyNumbers[9]={57,10}
   function bbs.util.numericChoice(max,prefix,message)
     if not prefix then prefix="" end
     local chosen=false
+    local chooses={}
+    if max==9 then chooses=bbs.keyNumbers
+    else
+      for i=0,max do
+        table.insert(chooses,bbs.keyNumbers[i])
+      end
+    end
     while not chosen do
       if type(message)=="table" then
         api.text(message)
       end
-      local choice=api.input(40,prefix)
-      if choice:match("^%d+$") ~= nil then
-        choice=tonumber(choice)
-        if choice>0 and choice<=tonumber(max) then
-          return choice
+      local choice=api.keyPress(40,chooses)
+      for i=0,9 do
+        if choice==bbs.keyNumbers[i][1] then
+          return i
         end
+        print("Strange!")
+        return 0
       end
     end
   end
@@ -294,8 +313,11 @@ function app.main(to_ip)
   end
   function bbs.msg.list()
     api.text("-LIST---------------")
+    local c=0
     for id,msg in pairs(app.db.messages) do
+      if c%10==0 then api.keyPress(60) c=0 end
       api.text("ID: "..id.."|"..app.db:getUserName(msg.userId).." "..msg.subject)
+      c=c+1
     end
   end
   function bbs.msg.markRead()
@@ -318,8 +340,8 @@ function app.main(to_ip)
   function bbs.msg.new()
     api.text("--------------------")
     local new_subject=api.input(30,"Subject: ")
-    if new_subject=="" then 
-      api.text("Subject cannot be empty!")
+    if new_subject=="" then
+      api.text("Subject cannot be empty!",styles["error"])
       return
     end
     api.text("---Message----------")
@@ -332,7 +354,7 @@ function app.main(to_ip)
   end
   function bbs.msg.read()
     local id=tonumber(api.input(60,"Enter Message ID:"))
-    if not id then api.text("[!]ID is a number") return end
+    if not id then api.text("[!]ID is a number",styles["error"]) return end
     local msg=app.db:getMessage(id)
     if msg then bbs.msg.printMessadge(id)
     else api.text("No message with id: "..id) end
@@ -342,9 +364,10 @@ function app.main(to_ip)
       "---ADMIN-MENU-----",
       "1)List all users",
       "2)Delete user",
-      "3)Promote/demote user"
+      "3)Promote/demote user",
+      "4)Delete message"
     }
-    local choice=bbs.util.numericChoice(3,"ADMIN>: ",menu_message)
+    local choice=bbs.util.numericChoice(4,"ADMIN>: ",menu_message)
     if choice==1 then bbs.admin.listUsers()
     elseif choice==2 then
       local name=api.input(60,"Name: ")
@@ -360,6 +383,13 @@ function app.main(to_ip)
       else
         api.text("No such user!")
       end
+    elseif choice==4 then
+      local id=tonumber(api.input(60,"Enter Message ID:"))
+      if not id then api.text("[!]ID is a number",styles["error"]) return end
+      local msg=app.db:getMessage(id)
+      if msg then
+        app.db.messages[i]=nil
+      else api.text("No message with id: "..id) end
     end
   end
   function bbs.admin.listUsers()
@@ -391,7 +421,7 @@ function app.main(to_ip)
       if current_user.admin==true then
         bbs.admin.menu()
       else
-        api.text("You are not an admin!")
+        api.text("You are not an admin!",styles["error"])
       end
     end
   end
