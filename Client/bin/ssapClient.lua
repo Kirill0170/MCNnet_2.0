@@ -67,10 +67,18 @@ function connection(to_ip,timeout)
     end
   end
 end
+local function setDownloadHome(new)
+  if ssap.setDownloadRoot(new) then
+    print("Success")
+  else
+    cprint("Couldn't set download root to "..new,0xFF0000)
+  end
+end
 --main
 local args,ops = shell.parse(...)
 if not args and not ops then help()
 elseif ops["h"] or ops["help"] then help()
+elseif args[1]=="setdownloadhome" then setDownloadHome(args[2])
 elseif ip.isIPv2(args[1]) or mnp.checkHostname(args[1]) then connection(args[1],ops["t"])
 else help() end
 --TODO: VERSION CHECKING

@@ -1,6 +1,7 @@
-local version="1.7"
+local version="1.7.2"
 local component=require("component")
 local computer=require("computer")
+local fs=require("filesystem")
 local ser=require("serialization")
 local thread=require("thread")
 local event=require("event")
@@ -11,7 +12,19 @@ local term=require("term")
 local ssap={}
 ssap.client={}
 ssap.server={}
+ssap.defaultDownloadRoot="/home/"
 --Util-----------------------
+function ssap.setDownloadRoot(new)
+  if fs.exists(new) and fs.isDirectory(new) then
+    if string.sub(new,#new,#new)~="/" then new=new.."/" end
+    ssap.defaultDownloadRoot=new
+    return true
+  end
+  return false
+end
+function ssap.applyDownloadRoot(filename)
+  return ssap.defaultDownloadRoot..string.match(filename, "([^/]+)$")
+end
 function ssap.log(text,crit)
   cmnp.log("SSAP",text,crit)
 end
@@ -311,7 +324,7 @@ end
 function ssap.client.GetFile(server_ip,getfilename,writefilename,pretty)
   if not ip.isIPv2(server_ip) then return false end
   if not getfilename then return false end
-  if not writefilename then writefilename=getfilename end
+  if not writefilename then writefilename=ssap.applyDownloadRoot(getfilename) end
   local ftp=ssap.safeRequire("ftp")
   if not ftp then return false end
   if ftp.connection(server_ip) then
