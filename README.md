@@ -4,7 +4,6 @@ Advanced node networking for Open Computers, still under active development.
 
 ## Currently written:
 * Low-level commpunication between nodes & clients(searching & sending packets)
-* Domain names are NOT written
 * Protocols: MNP, MNCP(pinging), SSAP
 * SSAP servers are working for use
 * FTP protocol for transmitting files
