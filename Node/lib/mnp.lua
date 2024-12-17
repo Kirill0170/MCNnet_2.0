@@ -113,6 +113,7 @@ end
 function mnp.setDomain(np,domain)
 	if not mnp.checkHostname(domain[1]) then return false end
 	if not netpacket.checkPacket(np) then return false end
+	mnp.log("MNP","Setting domain "..domain[1].." for "..np["route"][0])
 	mnp.domains[np["route"][0]]=domain[1]
 	return true
 end
@@ -316,7 +317,7 @@ function mnp.pass(port, mtype, np, data)
 		mnp.log("MNP","Tried: "..tostring(np["c"]))
 		return false
 	end
-	modem.send(to, ports["mnp_data"], mtype, ser.serialize(np), ser.serialize(data))
+	modem.send(to, port, mtype, ser.serialize(np), ser.serialize(data))
 	return true
 end
 -------
