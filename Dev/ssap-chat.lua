@@ -1,17 +1,12 @@
 --[[
-  SSAP APPLICATION
-
-  Your application is down below.
-  DO NOT EDIT ANYTHING ELSE, unless you know what you
-  are doing.
-
-  api table is yours to use in your application.
-  configure your application in CONFIG section.
+  SSAP simple chat
+  basic commands and chatroom.
 ]]
 --CONFIG
 local config={}
-config["name"]="app" --your application name
+config["name"]="chat app" --your application name
 config["log"]=true --log stuff
+config["ver"]="1.1"
 
 local styles={} -- configure styles here
 styles["error"]={} --red text
@@ -84,6 +79,7 @@ function app.main(to_ip) --will be used for each client
       if chat.users[i]==to_ip then
         table.remove(chat.users,i)
         table.remove(chat.usernames,i)
+        if config["log"] then print("<CHAT> User left: "..username) end
       end
     end
     return
@@ -150,11 +146,12 @@ function app.main(to_ip) --will be used for each client
   ssap.server.textlisten(to_ip)
   table.insert(chat.users,to_ip)
   table.insert(chat.usernames,username)
+  if config["log"] then print("<CHAT> New user: "..username) end
   computer.pushSignal("chat_join",username)
-  while true do --main loop(You don't want your application to finish, right?)
-    api.keyPress(600)
-    local str=api.input(600,"> ")
-    if not str then return false end
+  while true do
+    if not api.keyPress(600) then api.exit() return false end --wait for input
+    local str=api.input(600,"> ") --input
+    if not str then api.exit() return false end
     if string.sub(str,1,1)=="/" then
       if str=="/q" or str=="/exit" then
         api.exit()--or os.exit()
