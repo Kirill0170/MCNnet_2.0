@@ -1,0 +1,8 @@
+#title:Webpage
+#resolution:80x20
+#colormap:wool
+#format:%#
+#main
+Hello world!
+This is a document page!
+It has %a colorful % text!
