@@ -13,7 +13,7 @@ local thread=require("thread")
 local event=require("event")
 local ip=require("ipv2")
 local gpu=component.gpu
-local mnp_ver="2.5.2 BETA"
+local mnp_ver="2.5.3 BETA"
 local mncp_ver="2.4.2 INDEV"
 local forbidden_vers={}
 forbidden_vers["mnp"]={"2.21 EXPERIMENTAL"}
@@ -363,6 +363,7 @@ function mnp.setDomain(domain)
   if not mnp.checkHostname(domain) then return false end
   if not mnp.isConnected() then return false end
   modem.send(os.getenv("node_uuid"),ports["mnp_reg"],"setdomain",ser.serialize(netpacket.newPacket()),ser.serialize({domain}))
+  os.setenv("this_domain",domain)
   return true
 end
 function mnp.disconnect()
@@ -382,7 +383,28 @@ function mnp.isConnected(ping)
   end
   return false
 end
-
+function mnp.checkAvailability(dest)
+  local domain=""
+  if mnp.checkHostname(dest) then
+    domain=dest
+    if not mnp.getFromDomain(domain) then
+      mnp.log("MNP","No route to "..domain.." found. searching...",1)
+      if not mnp.search("",60,domain) then
+        mnp.log("MNP","Failed search",1)
+        return false
+      end
+    end
+    dest=mnp.getFromDomain(domain)[1]
+  elseif not mnp.getSavedRoute(dest) then
+    mnp.log("MNP","No route to "..dest.." found. searching...",1)
+    if not mnp.search(dest) then
+      mnp.log("MNP","Failed search",1)
+      return false
+    end
+  end
+  if not mnp.getSavedRoute(dest) then mnp.log("MNP","Couldn't get route for "..dest,2) return false,nil end
+  return true,dest
+end
 function mnp.search(to_ip,searchTime,domain)
   if not mnp.isConnected() then return false end
   if ip.isIPv2(to_ip)==false and to_ip~="" and to_ip~="broadcast" then return false end

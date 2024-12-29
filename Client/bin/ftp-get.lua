@@ -1,4 +1,4 @@
-local ver="1.2"
+local ver="1.3"
 local mnp=require("cmnp")
 local ftp=require("ftp")
 local shell=require("shell")
@@ -24,30 +24,16 @@ local function help()
   print("ftp-get example.com /etc/about.txt /home/downloaded.txt")
 end
 
-local function connection(to_ip,filename,writefilename)
+local function connection(dest,filename,writefilename)
   if not mnp.isConnected() then cprint("You should be connected to network",0xFF0000) return false end
   if not filename then cprint("What file to get?",0xFF0000) return false end
   if not writefilename then writefilename=filename end
   --check destination
-  local domain=""
-  if mnp.checkHostname(to_ip) then
-    domain=to_ip
-    if not mnp.getFromDomain(domain) then
-      cprint("No route to "..domain.." found. searching...",0xFFCC33)
-      if not mnp.search("",60,domain) then
-        cprint("Failed search",0xFFCC33)
-        return false
-      end
-    end
-    to_ip=mnp.getFromDomain(domain)[1]
-  elseif not mnp.getSavedRoute(to_ip) then
-    cprint("No route to "..to_ip.." found. searching...",0xFFCC33)
-    if not mnp.search(to_ip) then
-      cprint("Failed search",0xFFCC33)
-      return false
-    end
+  local check,to_ip=mnp.checkAvailability(dest)
+  if not check then
+    cprint("Couldn't connect",0xFF0000)
+    return false
   end
-  if not mnp.getSavedRoute(to_ip) then cprint("Couldn't get route for "..to_ip,2) return false end
   --main
   if not ftp.connection(to_ip) then
     cprint("Couldn't connect to "..to_ip,0xFF0000)
