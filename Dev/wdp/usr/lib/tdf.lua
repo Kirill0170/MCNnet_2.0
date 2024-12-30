@@ -1,3 +1,4 @@
+local ver="1.2"
 local fs=require("filesystem")
 local term=require("term")
 local gpu=require("component").gpu
@@ -39,12 +40,14 @@ colors["wool"]["D"]=0x336600 --darkgreen
 colors["wool"]["E"]=0xFF3333 --red
 colors["wool"]["F"]=0x000000 --black
 local tdf={}
+function tdf.ver() return ver end
+tdf.util={}
 TDFfile={}
 TDFfile.__index=TDFfile
-local function trimSpace(str)
+function tdf.util.trimSpace(str)
   return string.match(str,"^%s*(.*)")
 end
-local function splitBy(str,s)
+function tdf.util.splitBy(str,s)
   local res={}
   for i in str:gmatch("([^"..s.."]+)") do
     table.insert(res,i)
@@ -72,14 +75,14 @@ function TDFfile:readFile(filename)
     i=i+1
     --function word
     if not main then
-      local trimline=trimSpace(prevline)
+      local trimline=tdf.util.trimSpace(prevline)
       if string.sub(trimline,1,1)=="#" then
         trimline=trimline:sub(2)
-        local f_args=splitBy(trimline,":")
+        local f_args=tdf.util.splitBy(trimline,":")
         if f_args[1]=="title" then
           instance.config["title"]=f_args[2] or "error"
         elseif f_args[1]=="resolution" then
-          local f_res=splitBy(f_args[2],"x")
+          local f_res=tdf.util.splitBy(f_args[2],"x")
           local x=tonumber(f_res[1])
           local y=tonumber(f_res[2])
           if x and y then
@@ -140,7 +143,7 @@ function TDFfile:print(offsetY)
   end
   for l=self.config.main,#self.rawlines do
     term.setCursor(1,y)
-
+    --link
     formattedPrint(self.rawlines[l])
     y=y+1
   end
