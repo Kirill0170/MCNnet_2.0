@@ -1,4 +1,4 @@
-local ver="1.5.3"
+local ver="1.5.4"
 local ssap=require("ssap")
 local mnp=require("cmnp")
 local shell=require("shell")
@@ -18,7 +18,8 @@ local function help()
   print("Version "..ver)
   print("SSAP version: "..ssap.ver())
   print("About: simple SSAP conenction client")
-  cprint("Usage: client <options> server_ip",0x6699FF)
+  cprint("Usage: ssapClient <options> [server_ip/hostname]",0x6699FF)
+  print("        setdownloadhome <dir>")
   cprint("Options:",0x33CC33)
   print("--t=<int>      Timeout time")
 end
