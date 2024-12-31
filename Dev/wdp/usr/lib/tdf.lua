@@ -1,4 +1,4 @@
-local ver="1.2"
+local ver="1.3"
 local fs=require("filesystem")
 local term=require("term")
 local gpu=require("component").gpu
@@ -54,6 +54,9 @@ function tdf.util.splitBy(str,s)
   end
   return res
 end
+function tdf.util.isTDF(filename)
+  return string.match(filename, "%.tdf$") ~= nil
+end
 function TDFfile:readFile(filename)
   local file=io.open(filename)
   if not file then return nil end
@@ -66,9 +69,11 @@ function TDFfile:readFile(filename)
   instance.config["format"]="&%"
   instance.config["colormap"]="text"
   --read
-  local prevline=""
+  local prevline=file:read("*l")
   local main=false
   local i=0
+  --check
+  if prevline~="#tdf" then return nil end
   while prevline do
     prevline=file:read("*l")
     if not prevline then break end
@@ -147,6 +152,7 @@ function TDFfile:print(offsetY)
     formattedPrint(self.rawlines[l])
     y=y+1
   end
+  return true
 end
 function tdf.readFile(filename)
   if not fs.exists(filename) then return nil end

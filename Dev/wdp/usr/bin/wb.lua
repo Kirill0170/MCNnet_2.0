@@ -1,8 +1,7 @@
-local ver="0.1"
+local ver="0.2"
 local wdp=require("wdp")
 local mnp=require("cmnp")
 local shell=require("shell")
-local ip=require("ipv2")
 local gpu=require("component").gpu
 
 local function cprint(text,color)
@@ -28,16 +27,17 @@ end
 
 function connection(dest,saveAs)
   if not mnp.isConnected() then cprint("You should be connected to network",0xFF0000) return false end
-  if saveAs~=nil and saveAs~="" then
-    wdp.get(dest,saveAs)
-  else
-    wdp.get(dest)
+  if saveAs=="" then saveAs=nil end
+  local success,code=wdp.get(dest)
+  if not success then
+    cprint("Couldn't get page!",0xFF0000)
+    cprint("Error code: "..code,0xFF0000)
   end
 end
 --main
 local args,ops = shell.parse(...)
 if not args and not ops then help()
 elseif ops["h"] or ops["help"] then help()
-elseif ip.isIPv2(args[1]) or mnp.checkHostname(args[1]) then connection(args[1],args[2])
-else help() end
+elseif args[1]=="help" then help()
+else connection(args[1],args[2]) end
 --TODO: VERSION CHECKING

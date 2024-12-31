@@ -1,5 +1,5 @@
 --simple tdf viewer
-local ver="1.0"
+local ver="1.2"
 local shell=require("shell")
 local component=require("component")
 local gpu=component.gpu
@@ -24,12 +24,15 @@ local function view(filename)
   if not filename then cprint("No file given",0xFF0000) return end
   if not fs.exists(filename) then cprint("No such file: "..filename,0xFF0000) return end
   if fs.isDirectory(filename) then cprint("Direcotry given",0xFF0000) return end
+  if tdf.util.isTDF(filename) then cprint("You should give .tdf file",0xFF0000) return end
   local tfile=tdf.readFile(filename)
   if not tfile then cprint("Couldn't read file",0xFF0000) return end
   require("term").clear()
   gpu.setBackground(0xCCCCCC)
+  gpu.setForeground(0x000000)
   print("  "..tfile.config["title"].."  ")
   gpu.setBackground(0x000000)
+  gpu.setForeground(0xFFFFFF)
   tfile:print(1)
 end
 --main
