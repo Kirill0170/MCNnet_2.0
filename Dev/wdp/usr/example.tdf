@@ -1,8 +1,10 @@
-#tdf
+#tdf:1.4
 #title:Webpage
-#resolution:80x20
+#resolution:80x3
 #colormap:wool
 #format:%#
+#background:0
+#foreground:F
 #main
 Hello world!
 This is a document page!

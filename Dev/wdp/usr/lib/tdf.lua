@@ -1,11 +1,11 @@
-local ver="1.3"
+local ver="1.4.3"
 local fs=require("filesystem")
 local term=require("term")
 local gpu=require("component").gpu
 local colors={}
 colors["text"]={}--minecraft text formatting-like
 colors["wool"]={}--minecraft wool&dye order
-
+--text
 colors["text"]["0"]=0x000000 --black    
 colors["text"]["1"]=0x333399 --darkblue
 colors["text"]["2"]=0x336600 --darkgreen
@@ -22,7 +22,7 @@ colors["text"]["C"]=0xFF0000 --red
 colors["text"]["D"]=0xCC66CC --magenta
 colors["text"]["E"]=0xFFFF33 --yellow
 colors["text"]["F"]=0xFFFFFF --white
-
+--wool
 colors["wool"]["0"]=0xFFFFFF --white
 colors["wool"]["1"]=0xFFCC33 --gold
 colors["wool"]["2"]=0xCC66CC --magenta
@@ -68,12 +68,17 @@ function TDFfile:readFile(filename)
   instance.config["main"]=1
   instance.config["format"]="&%"
   instance.config["colormap"]="text"
+  instance.config["ver"]="unknown"
+  instance.config["background"]="0"
+  instance.config["foreground"]="F"
   --read
   local prevline=file:read("*l")
   local main=false
+  local bgset=false
   local i=0
   --check
-  if prevline~="#tdf" then return nil end
+  if string.sub(prevline,1,4)~="#tdf" then return nil end
+  instance.config["ver"]=tdf.util.splitBy(prevline,":")[2]
   while prevline do
     prevline=file:read("*l")
     if not prevline then break end
@@ -83,25 +88,38 @@ function TDFfile:readFile(filename)
       local trimline=tdf.util.trimSpace(prevline)
       if string.sub(trimline,1,1)=="#" then
         trimline=trimline:sub(2)
-        local f_args=tdf.util.splitBy(trimline,":")
-        if f_args[1]=="title" then
-          instance.config["title"]=f_args[2] or "error"
-        elseif f_args[1]=="resolution" then
-          local f_res=tdf.util.splitBy(f_args[2],"x")
-          local x=tonumber(f_res[1])
-          local y=tonumber(f_res[2])
+        local args=tdf.util.splitBy(trimline,":")
+        if args[1]=="title" then
+          instance.config["title"]=args[2] or "error"
+        elseif args[1]=="resolution" then
+          local res=tdf.util.splitBy(args[2],"x")
+          local x=tonumber(res[1])
+          local y=tonumber(res[2])
           if x and y then
             instance.config["resolution"]={x,y}
           end
-        elseif f_args[1]=="main" then
+        elseif args[1]=="main" then
           main=true
           instance.config["main"]=i+1 --start of file
-        elseif f_args[1]=="format" then
-          instance.config["format"]=f_args[2] or "&%"
-        elseif f_args[1]=="colormap" then
-          if f_args[2]=="wool" or f_args[2]=="text" then
-            instance.config["colormap"]=f_args[2]
+        elseif args[1]=="format" then
+          instance.config["format"]=args[2] or "&%"
+        elseif args[1]=="colormap" then
+          if args[2]=="wool" or args[2]=="text" then
+            if args[2]=="text" or args[2]=="wool" then
+              instance.config["colormap"]=args[2]
+            end
+            if not bgset then
+              if args[2]=="wool" then
+                instance.config["background"]="F"
+                instance.config["foreground"]="0"
+              end
+            end
           end
+        elseif args[1]=="background" then
+          instance.config["background"]=string.sub(args[2],1,1)
+          bgset=true
+        elseif args[1]=="foreground" then
+          instance.config["foreground"]=string.sub(args[2],1,1)
         end
       end
     end
@@ -109,13 +127,14 @@ function TDFfile:readFile(filename)
   end
   return instance
 end
-function TDFfile:print(offsetY)
-  local y=1
-  if offsetY then y=1+offsetY end
-  local default_fg=gpu.getForeground()
-  local default_bg=gpu.getBackground()
+function TDFfile:print(startLine,offsetY)
+  if not startLine then startLine=0 end
+  if not offsetY then offsetY=1 end
+  local y=offsetY+1
   local fg_char=self.config.format:sub(1,1)
   local bg_char=self.config.format:sub(2,2)
+  gpu.setForeground(colors[self.config.colormap][self.config.foreground])
+  gpu.setBackground(colors[self.config.colormap][self.config.background])
   local function formattedPrint(line)
     local i=1
     while i<=#line do
@@ -128,8 +147,8 @@ function TDFfile:print(offsetY)
           term.write(nextChar)
           i=i+2
         elseif nextChar=="r" then
-          if char==fg_char then gpu.setForeground(default_fg)
-          else gpu.setBackground(default_bg) end
+          if char==fg_char then gpu.setForeground(colors[self.config.colormap][self.config.foreground])
+          else gpu.setBackground(colors[self.config.colormap][self.config.background]) end
           i=i+2+skip
         else
           if nextChar:match("%l") then nextChar=string.upper(nextChar) end
@@ -146,12 +165,20 @@ function TDFfile:print(offsetY)
       end
     end
   end
-  for l=self.config.main,#self.rawlines do
+  --range
+  local startLine=self.config.main+startLine
+  local endLine=startLine+self.config.resolution[2]
+  if endLine>#self.rawlines then endLine=#self.rawlines end
+  --fill
+  gpu.setBackground(colors[self.config.colormap][self.config.background])
+  gpu.fill(1,offsetY+1,self.config.resolution[1],self.config.resolution[2]," ")
+  for l=startLine,endLine do
     term.setCursor(1,y)
     --link
     formattedPrint(self.rawlines[l])
     y=y+1
   end
+  term.setCursor(1,self.config.resolution[2]+offsetY+1)
   return true
 end
 function tdf.readFile(filename)

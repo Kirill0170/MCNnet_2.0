@@ -14,7 +14,7 @@ function wdp.resolve(url)
   return hostname,filename
 end
 function wdp.printAddressBar(url,x)
-  local str="wdp://"..url
+  local str=" wdp://"..url
   while string.len(str)<x do str=str.." " end
   local prev_x,prev_y=term.getCursor()
   term.setCursor(1,1)

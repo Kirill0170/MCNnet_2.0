@@ -33,7 +33,7 @@ local function view(filename)
   print("  "..tfile.config["title"].."  ")
   gpu.setBackground(0x000000)
   gpu.setForeground(0xFFFFFF)
-  tfile:print(1)
+  tfile:print(0,1)
 end
 --main
 local args,ops = shell.parse(...)
