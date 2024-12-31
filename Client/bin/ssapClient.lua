@@ -38,7 +38,7 @@ function connection(dest,timeout)
   local domain=""
   if mnp.checkHostname(dest) then domain=dest end
   if domain~="" then print("Connecting to "..domain.."("..to_ip..")")
-  else print("Connectiong to "..to_ip) end
+  else print("Connecting to "..to_ip) end
   if not ssap.client.connect(to_ip,timeout) then
     cprint("Couldn't connect!",0xFF0000)
   else
