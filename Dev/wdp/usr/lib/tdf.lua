@@ -1,4 +1,4 @@
-local ver="1.4.3"
+local ver="1.4.4"
 local fs=require("filesystem")
 local term=require("term")
 local gpu=require("component").gpu
@@ -42,8 +42,6 @@ colors["wool"]["F"]=0x000000 --black
 local tdf={}
 function tdf.ver() return ver end
 tdf.util={}
-TDFfile={}
-TDFfile.__index=TDFfile
 function tdf.util.trimSpace(str)
   return string.match(str,"^%s*(.*)")
 end
@@ -57,6 +55,8 @@ end
 function tdf.util.isTDF(filename)
   return string.match(filename, "%.tdf$") ~= nil
 end
+TDFfile={}
+TDFfile.__index=TDFfile
 function TDFfile:readFile(filename)
   local file=io.open(filename)
   if not file then return nil end
@@ -77,6 +77,7 @@ function TDFfile:readFile(filename)
   local bgset=false
   local i=0
   --check
+  if not prevline then return nil end
   if string.sub(prevline,1,4)~="#tdf" then return nil end
   instance.config["ver"]=tdf.util.splitBy(prevline,":")[2]
   while prevline do
@@ -125,6 +126,7 @@ function TDFfile:readFile(filename)
     end
     table.insert(instance.rawlines,prevline)
   end
+  file:close()
   return instance
 end
 function TDFfile:print(startLine,offsetY)

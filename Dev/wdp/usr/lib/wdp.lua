@@ -1,4 +1,5 @@
-local ver="0.3.3"
+local ver="0.4"
+local shouldCheckTDFver=false
 local mnp=require("cmnp")
 local tdf=require("tdf")
 local ftp=require("ftp")
@@ -8,22 +9,17 @@ local event=require("event")
 local ser=require("serialization")
 local wdp={}
 function wdp.ver() return ver end
+function wdp.setCheckTDF(val)
+  if type(val)=="boolean" then
+    shouldCheckTDFver=val
+    return true
+  end
+  return false
+end
 function wdp.resolve(url)
   if not url then return nil,nil end
   local hostname,filename=url:match("([^/]+)/(.+)")
   return hostname,filename
-end
-function wdp.printAddressBar(url,x)
-  local str=" wdp://"..url
-  while string.len(str)<x do str=str.." " end
-  local prev_x,prev_y=term.getCursor()
-  term.setCursor(1,1)
-  gpu.setBackground(0xCCCCCC)
-  gpu.setForeground(0x000000)
-  print(str)
-  gpu.setBackground(0x000000)
-  gpu.setForeground(0xFFFFFF)
-  term.setCursor(prev_x,prev_y)
 end
 function wdp.get(url,saveAs)
   local dest,filename=wdp.resolve(url)
@@ -40,11 +36,10 @@ function wdp.get(url,saveAs)
   if not success then return false,"FTP_GET_FAIL:"..tostring(err) end
   local tfile=tdf.readFile(downloadName)
   if not tfile then return false,"TDF_READ_FAIL" end
-  term.clear()
-  tfile:print(1)
-  os.sleep(0.1)
-  wdp.printAddressBar(url.." - "..tfile.config["title"],tfile.config["resolution"][1])
-  return true,"OK"
+  if shouldCheckTDFver then
+    if tfile.config.ver~=tdf.ver() then return false,"TDF_DIFF_VER" end
+  end
+  return true,tfile
 end
 function wdp.send(to_ip,filename)
   mnp.send(to_ip,"wdp",{"response"})
