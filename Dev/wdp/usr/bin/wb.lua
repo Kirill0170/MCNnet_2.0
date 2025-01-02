@@ -1,4 +1,4 @@
-local ver="0.8.1"
+local ver="0.8.4"
 local wdp=require("wdp")
 local tdf=require("tdf")
 local mnp=require("cmnp")
@@ -8,7 +8,7 @@ local shell=require("shell")
 local fs=require("filesystem")
 local gpu=require("component").gpu
 
-local defaultResolution="80x22"
+local defaultResolution="80x23"
 local defaultColormap="wool"
 local defaultBackground="0"
 
@@ -19,13 +19,13 @@ local function printTabBar(tabs,selected)
   term.setCursor(1,1)
   term.write("WB ")
   for i=1,#tabs do
+    local str="["..i.." "..tabs[i].title.."]"
+    if tabs[i].canScroll==true then str=str..tabs[i].scroll end
     if i==selected then
-      local str="["..i.." "..tabs[i].title.."]"
       gpu.setForeground(0x6699FF)
       term.write(str)
       gpu.setForeground(0x000000)
     else
-      local str="["..i.." "..tabs[i].title.."]"
       term.write(str)
     end
   end
@@ -60,6 +60,16 @@ local function printAddressBar(url,tfile,override)
   gpu.setForeground(0xFFFFFF)
   term.setCursor(prev_x,prev_y)
 end
+function printFooter(tab)
+
+end
+local function clearPage()
+  local res=tdf.util.splitBy(defaultResolution,"x")
+  local x=tonumber(res[1])
+  local y=tonumber(res[2])
+  gpu.fill(1,3,x,y," ")
+  term.setCursor(1,3)
+end
 --Tab
 Tab={}
 Tab.nextId=1
@@ -82,6 +92,13 @@ function Tab:new(tfile,url,loc)
   instance.loc=loc or false
   instance.url=url
   instance.scroll=0
+  instance.maxScroll=0
+  instance.canScroll=false
+  local pageHeight=tonumber(tdf.util.splitBy(defaultResolution,"x")[2])
+  if instance.tfile.config.resolution[2]>pageHeight then
+    instance.canScroll=true
+    instance.maxScroll=instance.tfile.config.resolution[2]-pageHeight
+  end
   instance.id=Tab.nextId
   Tab.nextId=Tab.nextId+1
   Tab.selected=#Tab.tabs+1
@@ -108,9 +125,11 @@ function Tab:close()
 end
 function Tab:print(scroll) --LOCAL
   if scroll then self.scroll=scroll end
+  clearPage()
+  local height=tonumber(tdf.util.splitBy(defaultResolution,"x")[2])
+  self.tfile:print({self.scroll,self.scroll+height-1},2)
   printTabBar(Tab.tabs,getTabIndex(self.id))
   printAddressBar(self.url,self.tfile,self.loc)
-  self.tfile:print(self.scroll,2)
 end
 
 local function cprint(text,color)
@@ -128,13 +147,6 @@ local function createLocalPage(title,lines,filename)
   file:write(lines)
   file:close()
   return filename
-end
-local function clearPage()
-  local res=tdf.util.splitBy(defaultResolution,"x")
-  local x=tonumber(res[1])
-  local y=tonumber(res[2])
-  gpu.fill(1,3,x,y," ")
-  term.setCursor(1,3)
 end
 local function errorPage(url,code)
   local error_message="\n        Connection failed\n\n    An error occured while trying to connect to "..url.."\n"
@@ -182,14 +194,15 @@ function page(dest,saveAs)
       local tfile=tdf.readFile(filename)
       if not tfile then
         --error
-        return false,"TDF_READ_FAIL"
+        errorPage(dest,"TDF_READ_FAIL")
+        return false
       end
       local t=Tab:new(tfile,filename,"local://")
       t:print()
       return true
     else
-      --error page
-      return false,"NO_SUCH_FILE"
+      errorPage(dest,"NO_SUCH_FILE")
+      return false
     end
   end
   if not mnp.isConnected() then cprint("You should be connected to network",0xFF0000) return false end
@@ -204,6 +217,18 @@ function page(dest,saveAs)
     t:print()
     return true
   end
+end
+function scrollPage(n)
+  local t=Tab.tabs[Tab.selected]
+  if t.canScroll then
+    if t.scroll+n<=t.maxScroll and t.scroll+n>=0 then
+      t.scroll=t.scroll+n
+      t:print()
+    end
+  end
+end
+function scrollDown()
+
 end
 function browser(dest,saveAs)
   if dest then
@@ -237,13 +262,16 @@ function browser(dest,saveAs)
           Tab.selected=1
         end
         printSelectedTab()
+      elseif keyB==200 then -- ^
+      elseif keyB==208 then -- \/
+
       elseif keyA==43 and keyB==13 then -- +
         newPage()
       elseif keyB==31 then -- s 
         --save
       end
     elseif id=="scroll" then
-
+      scrollPage(scroll)
     end
   end
 end
