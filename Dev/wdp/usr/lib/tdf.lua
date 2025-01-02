@@ -1,4 +1,4 @@
-local ver="1.4.4"
+local ver="1.4.6"
 local fs=require("filesystem")
 local term=require("term")
 local gpu=require("component").gpu
@@ -129,8 +129,16 @@ function TDFfile:readFile(filename)
   file:close()
   return instance
 end
-function TDFfile:print(startLine,offsetY)
-  if not startLine then startLine=0 end
+function TDFfile:print(range,offsetY)
+  local startLine=0
+  local endLine=self.config.resolution[2]
+  if type(range)=="table" then
+    if #range==2 then
+      startLine=range[1]
+      endLine=range[2]
+      if startLine<0 then startLine=0 end
+    end
+  end
   if not offsetY then offsetY=1 end
   local y=offsetY+1
   local fg_char=self.config.format:sub(1,1)
@@ -162,14 +170,14 @@ function TDFfile:print(startLine,offsetY)
           i=i+2+skip
         end
       else
-        io.write(char)
+        term.write(char)
         i=i+1
       end
     end
   end
   --range
   local startLine=self.config.main+startLine
-  local endLine=startLine+self.config.resolution[2]
+  local endLine=self.config.main+endLine
   if endLine>#self.rawlines then endLine=#self.rawlines end
   --fill
   gpu.setBackground(colors[self.config.colormap][self.config.background])
@@ -177,7 +185,15 @@ function TDFfile:print(startLine,offsetY)
   for l=startLine,endLine do
     term.setCursor(1,y)
     --link
-    formattedPrint(self.rawlines[l])
+    local check_fg=fg_char
+    local check_bg=bg_char
+    if fg_char=="%" then check_fg="%%" end
+    if bg_char=="%" then check_bg="%%" end
+    if string.find(self.rawlines[l],check_fg) or string.find(self.rawlines[l],check_bg) then
+      formattedPrint(self.rawlines[l])
+    else
+      term.write(string.sub(self.rawlines[l],1,self.config.resolution[1]))
+    end
     y=y+1
   end
   term.setCursor(1,self.config.resolution[2]+offsetY+1)
