@@ -1,15 +1,24 @@
-local ver="0.5"
+local ver="0.6"
 local shouldCheckTDFver=false
 local mnp=require("cmnp")
 local tdf=require("tdf")
 local ftp=require("ftp")
 local event=require("event")
 local ser=require("serialization")
+local fs=require("filesystem")
 local wdp={}
 function wdp.ver() return ver end
 function wdp.setCheckTDF(val)
   if type(val)=="boolean" then
     shouldCheckTDFver=val
+    return true
+  end
+  return false
+end
+function wdp.isSubdir(allowedDir,givenDir)
+  local normalizedRoot = allowedDir:gsub("/+$", "")
+  local normalizedGivenDir = givenDir:gsub("/+$", "")
+  if normalizedGivenDir:sub(1, #normalizedRoot) == normalizedRoot then
     return true
   end
   return false
@@ -42,7 +51,6 @@ function wdp.get(url,saveAs)
   return true,tfile
 end
 function wdp.send(to_ip,filename)--add file check
-  local fs=require("filesystem")
   local check=filename
   if string.sub(filename,1,1)~="/" then
     check=fs.concat(require("shell").getWorkingDirectory(),filename)
@@ -69,8 +77,10 @@ function wdp.send(to_ip,filename)--add file check
   mnp.log("WDP","Disconnecting "..to_ip)
   return true
 end
-function wdp.server()
+function wdp.server(allowedDirectory)
+  if allowedDirectory=="" then allowedDirectory=nil end
   mnp.log("WDP","Starting webserver")
+  if allowedDirectory then mnp.log("WDP","Allowed directory: "..allowedDirectory) end
   local thread=require("thread")
   local stopEvent="wdpStop"
   local dataEvent="wdpData"
@@ -84,8 +94,23 @@ function wdp.server()
       mnp.log("WDP","Client connection with "..from_ip)
       rdata=ser.unserialize(rdata)
       if rdata[1]=="get" then
-        mnp.log("WDP","Sending "..rdata[2].." to "..from_ip)
-        thread.create(wdp.send,from_ip,rdata[2]):detach()
+        if allowedDirectory then
+          local check=rdata[2]
+          if string.sub(check,1,1)~="/" then
+            check=fs.concat(require("shell").getWorkingDirectory(),rdata[2])
+          end
+          if not wdp.isSubdir(allowedDirectory,check) then
+            mnp.log("WDP","Forbidden file: "..check,1)
+            mnp.send(from_ip,"wdp",{203,"Forbidden"})
+            mnp.log("WDP","Disconnecting "..from_ip)
+          else
+            mnp.log("WDP","Sending "..rdata[2].." to "..from_ip)
+            thread.create(wdp.send,from_ip,rdata[2]):detach()
+          end
+        else
+          mnp.log("WDP","Sending "..rdata[2].." to "..from_ip)
+          thread.create(wdp.send,from_ip,rdata[2]):detach()
+        end
       end
     end
   end
