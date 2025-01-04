@@ -1,4 +1,4 @@
-local ver="1.4.6"
+local ver="1.4.7"
 local fs=require("filesystem")
 local term=require("term")
 local gpu=require("component").gpu
@@ -197,6 +197,17 @@ function TDFfile:print(range,offsetY)
     y=y+1
   end
   term.setCursor(1,self.config.resolution[2]+offsetY+1)
+  return true
+end
+function TDFfile:saveAs(savename)
+  if not savename then return false end
+  local file=io.open(savename,"w")
+  if not file then return false end
+  file:write("#tdf:"..self.config.ver.."\n")
+  for i=1,#self.rawlines do
+    file:write(self.rawlines[i].."\n")
+  end
+  file:close()
   return true
 end
 function tdf.readFile(filename)
