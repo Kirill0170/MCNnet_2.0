@@ -1,4 +1,4 @@
-local ver="0.8.4"
+local ver="0.9.1"
 local wdp=require("wdp")
 local tdf=require("tdf")
 local mnp=require("cmnp")
@@ -8,10 +8,15 @@ local shell=require("shell")
 local fs=require("filesystem")
 local gpu=require("component").gpu
 
-local defaultResolution="80x23"
+local defaultResolution="80x22"
 local defaultColormap="wool"
 local defaultBackground="0"
 
+local function cprint(text,color)
+  gpu.setForeground(color)
+  print(text)
+  gpu.setForeground(0xFFFFFF)
+end
 local function printTabBar(tabs,selected)
   gpu.setBackground(0xCCCCCC)
   gpu.setForeground(0x000000)
@@ -20,7 +25,6 @@ local function printTabBar(tabs,selected)
   term.write("WB ")
   for i=1,#tabs do
     local str="["..i.." "..tabs[i].title.."]"
-    if tabs[i].canScroll==true then str=str..tabs[i].scroll end
     if i==selected then
       gpu.setForeground(0x6699FF)
       term.write(str)
@@ -60,8 +64,46 @@ local function printAddressBar(url,tfile,override)
   gpu.setForeground(0xFFFFFF)
   term.setCursor(prev_x,prev_y)
 end
-function printFooter(tab)
-
+local function printFooter(tab)
+  gpu.setBackground(0xCCCCCC)
+  gpu.setForeground(0x000000)
+  local prev_x,prev_y=term.getCursor()
+  local resX,resY=gpu.getResolution()
+  term.setCursor(1,resY)
+  local str="static"
+  if tab.canScroll then
+    str="scroll: "..tab.scroll.."/"..tab.maxScroll
+  end
+  while string.len(str)<resX do str=str.." " end
+  term.write(str)
+  gpu.setBackground(0x000000)
+  gpu.setForeground(0xFFFFFF)
+  term.setCursor(prev_x,prev_y)
+end
+local function customFooter(text)
+  if not text then text="" end
+  gpu.setBackground(0xCCCCCC)
+  gpu.setForeground(0x000000)
+  local prev_x,prev_y=term.getCursor()
+  local resX,resY=gpu.getResolution()
+  term.setCursor(1,resY)
+  while string.len(text)<resX do text=text.." " end
+  term.write(text)
+  gpu.setBackground(0x000000)
+  gpu.setForeground(0xFFFFFF)
+  term.setCursor(prev_x,prev_y)
+end
+local function createLocalPage(title,lines,filename,res)
+  if not title then title="unknown" end
+  if not lines then lines="Browser empty page" end
+  if not filename then filename=os.tmpname() end
+  if not res then res=defaultResolution end
+  local file=io.open(filename,"w")
+  file:write("#tdf:"..tdf.ver().."\n#title:"..title.."\n#resolution:"..res.."\n")
+  file:write("#colormap:"..defaultColormap.."\n#format:%#\n#background:"..defaultBackground.."\n#foreground:F\n#main\n")
+  file:write(lines)
+  file:close()
+  return filename
 end
 local function clearPage()
   local res=tdf.util.splitBy(defaultResolution,"x")
@@ -69,6 +111,13 @@ local function clearPage()
   local y=tonumber(res[2])
   gpu.fill(1,3,x,y," ")
   term.setCursor(1,3)
+end
+local function errorPage(url,code)
+  local error_message="\n        Connection failed\n\n    An error occured while trying to connect to "..url.."\n"
+  error_message=error_message.."    Error code: %e "..code.." %r"
+  local filename=createLocalPage("Error",error_message)
+  local t=Tab:new(tdf.readFile(filename),url)
+  t:print()
 end
 --Tab
 Tab={}
@@ -110,10 +159,8 @@ function Tab:close()
   if i==1 then
     if #Tab.tabs==1 then
       --new empty page
-      gpu.setBackground(0x000000)
-      gpu.setForeground(0xFFFFFF)
-      term.clear()
-      os.exit()
+      page("local//etc/wb/wbhome.tdf")
+      Tab.selected=1
     else
       Tab.selected=1
     end
@@ -130,32 +177,41 @@ function Tab:print(scroll) --LOCAL
   self.tfile:print({self.scroll,self.scroll+height-1},2)
   printTabBar(Tab.tabs,getTabIndex(self.id))
   printAddressBar(self.url,self.tfile,self.loc)
+  printFooter(self)
+end
+function Tab:reload()
+  customFooter("Reloading")
+  if self.loc then
+    --local page
+    if fs.exists(self.url) and fs.isDirectory(self.url)==false then
+      local tfile=tdf.readFile(self.url)
+      if not tfile then
+        --error
+        errorPage(self.url,"TDF_READ_FAIL")
+        return false
+      end
+      Tab.tfile=tfile
+      self.scroll=0
+      self:print()
+      return true
+    else
+      errorPage(self.url,"NO_SUCH_FILE")
+      return false
+    end
+  end
+  local success,code=wdp.get(self.url)
+  if not success then
+    --error
+    errorPage(self.url,code)
+    return false
+  else
+    self.tfile=code
+    self.scroll=0
+    self:print()
+    return true
+  end
 end
 
-local function cprint(text,color)
-  gpu.setForeground(color)
-  print(text)
-  gpu.setForeground(0xFFFFFF)
-end
-local function createLocalPage(title,lines,filename)
-  if not title then title="unknown" end
-  if not lines then lines="Browser empty page" end
-  if not filename then filename=os.tmpname() end
-  local file=io.open(filename,"w")
-  file:write("#tdf:"..tdf.ver().."\n#title:"..title.."\n#resolution:"..defaultResolution.."\n")
-  file:write("#colormap:"..defaultColormap.."\n#format:%#\n#background:"..defaultBackground.."\n#foreground:F\n#main\n")
-  file:write(lines)
-  file:close()
-  return filename
-end
-local function errorPage(url,code)
-  local error_message="\n        Connection failed\n\n    An error occured while trying to connect to "..url.."\n"
-  error_message=error_message.."    Error code: %e "..code.." %r"
-  local filename=createLocalPage("Error",error_message)
-  local t=Tab:new(tdf.readFile(filename),url)
-  t:print()
-end
---functions
 local function help()
   cprint("WDP Browser",0xFFCC33)
   print("Version "..ver)
@@ -168,21 +224,6 @@ local function help()
   print("Examples:")
   print("wb 12ab:34cd/file.tdf")
   print("wb example.com//etc/man.tdf download.tdf")
-end
-function newPage()
-  clearPage()
-  term.setCursor(1,2)
-  gpu.setBackground(0xCCCCCC)
-  gpu.setForeground(0x000000)
-  local spaces=""
-  for i=1,80 do spaces=spaces.." " end
-  term.write(spaces)
-  term.setCursor(2,2)
-  local url=io.read()
-  gpu.setBackground(0xFFFFFF)
-  term.setCursor(1,3)
-  print("Connecting..")
-  page(url)
 end
 function page(dest,saveAs)
   if saveAs=="" then saveAs=nil end
@@ -219,6 +260,7 @@ function page(dest,saveAs)
   end
 end
 function scrollPage(n)
+  if not n then return end
   local t=Tab.tabs[Tab.selected]
   if t.canScroll then
     if t.scroll+n<=t.maxScroll and t.scroll+n>=0 then
@@ -227,8 +269,42 @@ function scrollPage(n)
     end
   end
 end
-function scrollDown()
-
+function newPage()
+  customFooter()
+  gpu.setBackground(0xCCCCCC)
+  gpu.setForeground(0x000000)
+  local prev_x,prev_y=term.getCursor()
+  local resX,resY=gpu.getResolution()
+  term.setCursor(1,resY)
+  term.write("URL: ")
+  local url=io.read()
+  term.setCursor(prev_x,prev_y)
+  printSelectedTab()
+  customFooter("Connecting..")
+  page(url)
+end
+function savePage()
+  local t=Tab.tabs[Tab.selected]
+  customFooter()
+  gpu.setBackground(0xCCCCCC)
+  gpu.setForeground(0x000000)
+  local prev_x,prev_y=term.getCursor()
+  local resX,resY=gpu.getResolution()
+  term.setCursor(1,resY)
+  term.write("Save as: ")
+  local savename=io.read()
+  term.setCursor(prev_x,prev_y)
+  printSelectedTab()
+  customFooter()
+  term.setCursor(1,resY)
+  local success=t.tfile:saveAs(savename)
+  if not success then
+    customFooter("Couldn't save as "..savename)
+  else
+    customFooter("Saved as "..savename)
+  end
+  os.sleep(1)
+  printFooter(t)
 end
 function browser(dest,saveAs)
   if dest then
@@ -247,6 +323,7 @@ function browser(dest,saveAs)
       elseif keyB==12 then-- -
         Tab.tabs[Tab.selected]:close()
       elseif keyB==25 then-- p
+        customFooter("Printing..")
         printSelectedTab()
       elseif keyB==203 then -- <-
         if Tab.selected>1 then
@@ -263,15 +340,18 @@ function browser(dest,saveAs)
         end
         printSelectedTab()
       elseif keyB==200 then -- ^
+        scrollPage(-1)
       elseif keyB==208 then -- \/
-
+        scrollPage(1)
       elseif keyA==43 and keyB==13 then -- +
         newPage()
       elseif keyB==31 then -- s 
-        --save
+        savePage()
+      elseif keyB==19 then -- r 
+        Tab.tabs[Tab.selected]:reload()
       end
     elseif id=="scroll" then
-      scrollPage(scroll)
+      scrollPage(-scroll)
     end
   end
 end
@@ -291,7 +371,7 @@ This browser (WB - Wdp Browser) makes it easy to view webpages.
 %5 wb <url> <saveAs> %r - opens page and saves it as given name
 
 %3 URL %r
-URL is a pair of hostname/IPv2 and file address on that server, divided by /
+%2 URL %r is a pair of hostname/IPv2 and file address on that server, divided by /
 You can open local pages on this computer by using 'local' as hostname
 Examples:
 12ab:34cd/home.tdf -> ~/home.tdf at 12ab:34cd server
@@ -304,10 +384,12 @@ local//etc/wb/wbhelp.tdf -> /etc/wb/wbhelp.tdf on this computer (this file)
 %9 + %r - new tab
 %9 - %r - close tab
 %9 p %r - reprint tab
+%9 r %r - reload tab
 %9 arrows < > %r - navigation between tabs
+%9 arrows ^ \/ or scroll %r - page scrolling
 %9 q or ctrl+c %r - close all and exit
 ]]
-  createLocalPage("Help",help_lines,"/etc/wb/wbhelp.tdf")
+  createLocalPage("Help",help_lines,"/etc/wb/wbhelp.tdf","80x25")
 end
 
 
@@ -321,12 +403,12 @@ elseif not args[1] then
   local local_ip=" - "
   local connct=""
   if connected then
-    local_ip=os.getenv("this_ip")
-    connct="%5 Connected! %r"
+    local_ip=tostring(os.getenv("this_ip"))
+    connct="%5Connected!%r"
   else
-    connct="%e Not connected! %r"
+    connct="%eNot connected!%r"
   end
-  local home_lines="WDP Browser version "..ver.."\n"
+  local home_lines="%3WDP Browser version %9"..ver.."%r\n"
   home_lines=home_lines..[[
 Home page
 
