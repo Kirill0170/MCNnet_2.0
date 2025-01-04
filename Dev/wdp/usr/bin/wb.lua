@@ -1,4 +1,4 @@
-local ver="0.9.1"
+local ver="0.9.2"
 local wdp=require("wdp")
 local tdf=require("tdf")
 local mnp=require("cmnp")
@@ -246,7 +246,7 @@ function page(dest,saveAs)
       return false
     end
   end
-  if not mnp.isConnected() then cprint("You should be connected to network",0xFF0000) return false end
+  if not mnp.isConnected() then errorPage(dest,"MNP_NOT_CONNECTED") return false end
   local success,code=wdp.get(dest)
   if not success then
     --error
