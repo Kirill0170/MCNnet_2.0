@@ -1,4 +1,4 @@
-local ver="0.9.2"
+local ver="0.9.3"
 local wdp=require("wdp")
 local tdf=require("tdf")
 local mnp=require("cmnp")
@@ -12,10 +12,8 @@ local defaultResolution="80x22"
 local defaultColormap="wool"
 local defaultBackground="0"
 
-local function cprint(text,color)
-  gpu.setForeground(color)
-  print(text)
-  gpu.setForeground(0xFFFFFF)
+local function getNewName()
+  return "/etc/wb/downloads/"..require("computer").uptime()
 end
 local function printTabBar(tabs,selected)
   gpu.setBackground(0xCCCCCC)
@@ -96,7 +94,7 @@ end
 local function createLocalPage(title,lines,filename,res)
   if not title then title="unknown" end
   if not lines then lines="Browser empty page" end
-  if not filename then filename=os.tmpname() end
+  if not filename then filename=getNewName() end
   if not res then res=defaultResolution end
   local file=io.open(filename,"w")
   file:write("#tdf:"..tdf.ver().."\n#title:"..title.."\n#resolution:"..res.."\n")
@@ -211,24 +209,13 @@ function Tab:reload()
     return true
   end
 end
-
-local function help()
-  cprint("WDP Browser",0xFFCC33)
-  print("Version "..ver)
-  print("Web Document Protocol version: "..wdp.ver())
-  print("About: simple WDP GET")
-  print("Downloads a webpage via FTP and opens it.")
-  print("You can set download filename as second argument")
-  print("Else, will be saved at /tmp/")
-  cprint("Usage: wb <options> [host/file] <saveAs>",0x6699FF)
-  print("Examples:")
-  print("wb 12ab:34cd/file.tdf")
-  print("wb example.com//etc/man.tdf download.tdf")
-end
-function page(dest,saveAs)
-  if saveAs=="" then saveAs=nil end
+function page(dest)
   if string.sub(dest,1,6)=="wdp://" then dest=string.sub(dest,7) end
   local hostname,filename=wdp.resolve(dest)
+  if not hostname or not filename then
+    errorPage(dest,"INVALID_URL")
+    return false
+  end
   if hostname=="local" or hostname==os.getenv("this_ip") then
     --local page
     if fs.exists(filename) and fs.isDirectory(filename)==false then
@@ -247,7 +234,7 @@ function page(dest,saveAs)
     end
   end
   if not mnp.isConnected() then errorPage(dest,"MNP_NOT_CONNECTED") return false end
-  local success,code=wdp.get(dest)
+  local success,code=wdp.get(dest,getNewName())
   if not success then
     --error
     errorPage(dest,code)
@@ -278,6 +265,7 @@ function newPage()
   term.setCursor(1,resY)
   term.write("URL: ")
   local url=io.read()
+  if url=="" then printSelectedTab() return end
   term.setCursor(prev_x,prev_y)
   printSelectedTab()
   customFooter("Connecting..")
@@ -293,6 +281,7 @@ function savePage()
   term.setCursor(1,resY)
   term.write("Save as: ")
   local savename=io.read()
+  if savename=="" then printSelectedTab() return end
   term.setCursor(prev_x,prev_y)
   printSelectedTab()
   customFooter()
@@ -306,9 +295,9 @@ function savePage()
   os.sleep(1)
   printFooter(t)
 end
-function browser(dest,saveAs)
+function browser(dest)
   if dest then
-    page(dest,saveAs)
+    page(dest)
   end
   while true do
     local id,_,keyA,keyB,scroll=event.pullMultiple("interrupted","key_down","scroll")
@@ -360,6 +349,9 @@ end
 if not fs.exists("/etc/wb") then
   fs.makeDirectory("/etc/wb")
 end
+if not fs.exists("/etc/wb/downloads") then
+  fs.makeDirectory("/etc/wb/downloads")
+end
 if not fs.exists("/etc/wb/wbhelp.tdf") then
   local help_lines=[[
 %3 Overview %r
@@ -394,9 +386,7 @@ end
 
 
 local args,ops = shell.parse(...)
-if not args and not ops then help()
-elseif ops["h"] or ops["help"] then help()
-elseif args[1]=="help" then
+if args[1]=="help" then
   browser("local//etc/wb/wbhelp.tdf")
 elseif not args[1] then
   local connected=mnp.isConnected()
@@ -420,7 +410,8 @@ Press + for new tab
   home_lines=home_lines..connct.."\nLocal IPv2: "..local_ip
   createLocalPage("Home",home_lines,"/etc/wb/wbhome.tdf")
   browser("local//etc/wb/wbhome.tdf")
-else browser(args[1],args[2]) end
+else browser(args[1]) end
 gpu.setForeground(0xFFFFFF)
 gpu.setBackground(0x000000)
+shell.execute("rm /etc/wb/downloads/*")
 term.clear()
