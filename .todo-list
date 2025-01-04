@@ -1,10 +1,7 @@
-WDP:
-fix TDF range
-
+WDP
+Package manager: connect to package servers and download/update stuff uisng version control system
 MNP: network-wide admin operations:
   get_network
 --future--
 UAP: security protocol for mcnnet
-Package manager: connect to package servers and download/update stuff uisng version control system
-SSTP: http-like websites
 some kind of rsh-like software
