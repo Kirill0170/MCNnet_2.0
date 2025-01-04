@@ -1,10 +1,8 @@
-local ver="0.4"
+local ver="0.5"
 local shouldCheckTDFver=false
 local mnp=require("cmnp")
 local tdf=require("tdf")
 local ftp=require("ftp")
-local term=require("term")
-local gpu=require("component").gpu
 local event=require("event")
 local ser=require("serialization")
 local wdp={}
@@ -29,7 +27,9 @@ function wdp.get(url,saveAs)
   mnp.send(to_ip,"wdp",{"get",filename})
   local rdata=mnp.receive(to_ip,"wdp",30)
   if not rdata then return false,"MNP_CONNECTION_TIMEOUT" end
-  os.sleep(0.5)
+  if rdata[1]~=100 then
+    return false,tostring(rdata[1])..": "..rdata[2]
+  end
   if not ftp.connection(to_ip) then return false,"FTP_CONNECTION_FAIL" end
   local downloadName=saveAs or os.tmpname()
   local success,err=ftp.request(to_ip,filename,downloadName,true,false)
@@ -41,13 +41,32 @@ function wdp.get(url,saveAs)
   end
   return true,tfile
 end
-function wdp.send(to_ip,filename)
-  mnp.send(to_ip,"wdp",{"response"})
+function wdp.send(to_ip,filename)--add file check
+  local fs=require("filesystem")
+  local check=filename
+  if string.sub(filename,1,1)~="/" then
+    check=fs.concat(require("shell").getWorkingDirectory(),filename)
+  end
+  if not fs.exists(check) or fs.isDirectory(check) then
+    mnp.send(to_ip,"wdp",{201,"Not Found or Directory"})
+    mnp.log("WDP","Failed sending "..filename.." to "..to_ip..": Not found or directory",1)
+    mnp.log("WDP","Disconnecting "..to_ip)
+    return false
+  end
+  if not tdf.util.isTDF(filename) then
+    mnp.send(to_ip,"wdp",{202,"Not TDF"})
+    mnp.log("WDP","Failed sending "..filename.." to "..to_ip..": Invalid file!",1)
+    mnp.log("WDP","Disconnecting "..to_ip)
+    return false
+  end
+  mnp.send(to_ip,"wdp",{100,"OK"})
   if not ftp.serverConnectionAwait(to_ip,30) then
     mnp.log("WDP","FTP connection with "..to_ip.." timeouted!",1)
+    mnp.log("WDP","Disconnecting "..to_ip)
     return false
   end
   ftp.serverConnection(to_ip,filename)
+  mnp.log("WDP","Disconnecting "..to_ip)
   return true
 end
 function wdp.server()
