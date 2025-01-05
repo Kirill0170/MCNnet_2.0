@@ -6,7 +6,7 @@
 local config={}
 config["name"]="BBS" --your application name
 config["log"]=true --log stuff
-config["ver"]="1.0.4"
+config["ver"]="1.0.5"
 config["sysopPasswd"]="admin" --ADMINISTRATOR PASSWORD
 config["sysopMOTD"]={"Welcome to the "..config["name"].." BBS!","Second line"}
 config["dbFilename"]="/home/bbs.db"
@@ -221,12 +221,12 @@ function app.main(to_ip)
       end
       local choice=api.keyPress(40,chooses)
       for i=0,9 do
-        if choice==bbs.keyNumbers[i][1] then
+        if choice[1]==bbs.keyNumbers[i][1] and choice[2]==bbs.keyNumbers[i][2] then
           return i
         end
-        print("Strange!")
-        return 0
       end
+      print("Strange! ",ser.serialize(choice))
+      return 0
     end
   end
   function bbs.util.yesnoChoice()
@@ -313,9 +313,9 @@ function app.main(to_ip)
   end
   function bbs.msg.list()
     api.text("-LIST---------------")
-    local c=0
+    local c=1
     for id,msg in pairs(app.db.messages) do
-      if c%10==0 then api.keyPress(60) c=0 end
+      if c%10==0 then api.keyPress(60) c=1 end
       api.text("ID: "..id.."|"..app.db:getUserName(msg.userId).." "..msg.subject)
       c=c+1
     end
@@ -388,7 +388,7 @@ function app.main(to_ip)
       if not id then api.text("[!]ID is a number",styles["error"]) return end
       local msg=app.db:getMessage(id)
       if msg then
-        app.db.messages[i]=nil
+        app.db.messages[id]=nil
       else api.text("No message with id: "..id) end
     end
   end
@@ -405,7 +405,7 @@ function app.main(to_ip)
   api.text("Welcome to "..config["name"].."!")
   api.text("Enter username, or NEW to create a user, or Guest.")
   bbs.login()
-  --user logined
+  --user logged in
   while true do --main
     local option=bbs.menu()
     if option==1 then bbs.msg.readNew()

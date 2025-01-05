@@ -1,7 +1,7 @@
 local mnp=require("cmnp")
 local ip=require("ipv2")
 local ser=require("serialization")
-local version="1.4.2b"
+local version="1.4.3"
 local ftp={}
 ftp.maxPacketLen=2048
 function ftp.ver() return version end
@@ -285,13 +285,13 @@ function ftp.serverConnection(to_ip,only)
         ftp.get(to_ip,filename,filename)
         mnp.log("FTP","Downloaded file: "..filename.." from "..to_ip)
       elseif rdata[1]=="end" then
-        mnp.log("FTP","Ended connection")
+        mnp.log("FTP","Ended connection with "..to_ip)
         return
       else
         mnp.log("FTP","Dunno: "..rdata[1])
       end
     else
-      mnp.log("FTP","Timeout")
+      mnp.log("FTP",to_ip.." timeouted")
       return
     end
   end

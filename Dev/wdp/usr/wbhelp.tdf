@@ -1,0 +1,29 @@
+#tdf:1.4.3
+#title:Help
+#resolution:80x24
+#colormap:wool
+#format:%#
+#background:0
+#foreground:F
+#main
+%3 Overview %r
+%2 WDP %r (Web Document Protocol) gets server-located %2 TDF %r (Text Document Format) page.
+This browser (WB - Wdp Browser) makes it easy to view webpages.
+
+%3 Command usage:%r
+%5 wb <url> %r - opens browser with page
+%5 wb <url> <saveAs> %r - opens page and saves it as given name
+
+%3 URL %r
+URL is a pair of server hostname/IPv2 and file address on that server, divided by /
+Examples:
+12ab:34cd/home.tdf -> ~/home.tdf at 12ab:34cd server
+example.com//file.tdf -> /file.tdf at example.com server
+
+%3 Keybinds: %r
+%9 h %r - open a new tab with this help page
+%9 s %r - save as
+%9 + %r - new tab
+%9 - %r - close tab
+%9 arrows < > %r - navigation between tabs
+%9 q or ctrl+c %r - close all and exit

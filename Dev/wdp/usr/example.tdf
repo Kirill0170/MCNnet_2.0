@@ -1,0 +1,11 @@
+#tdf:1.4.3
+#title:Webpage
+#resolution:80x22
+#colormap:wool
+#format:%#
+#background:0
+#foreground:F
+#main
+Hello world!
+This is a document page!
+It has %a colorful % text!
