@@ -8,10 +8,11 @@ Advanced node networking for Open Computers, still under active development.
 * SSAP servers are working for use
 * FTP protocol for transmitting files
 * Domain names for servers
+* WDP protocol for static .tdf websites
 ## Planned:
 * Tunnel Nodes for cross-dimentional communication
 * UAP for logins
-* (very planned) better website protocol
+* WDP backend support
 
 ## About
 MCNnet 2.0 stands for Minecraft Computer Node network, which is used to connect computers over distance using nodes. Not only you can connect two computers - you can create servers, which users will be able to join. The only limitation - nodes must be within 400 block range, as it's default connect range of wireless network card. However, usage of linked cards is possible, using Tunnel Nodes (Tnodes), allowing connections between distant places and across dimentions.
