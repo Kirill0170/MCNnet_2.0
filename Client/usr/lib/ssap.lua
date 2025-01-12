@@ -304,7 +304,7 @@ function ssap.server.sendFile(to_ip,filename,clientPretty)
     ssap.send(to_ip,{"ftp_file_get",{},{filename,clientPretty}})
     if not ftp.serverConnectionAwait(to_ip,30) then
     else
-      ftp.serverConnection(to_ip,filename)
+      ftp.serverConnection(to_ip,false,filename)
     end
   end
 end
@@ -317,7 +317,7 @@ function ssap.server.requestFile(to_ip,filename)
     ssap.send(to_ip,{"ftp_file_put",{},{filename}})
     if not ftp.serverConnectionAwait(to_ip,30) then
     else
-      ftp.serverConnection(to_ip,filename)
+      ftp.serverConnection(to_ip,false,filename)
     end
   end
 end
