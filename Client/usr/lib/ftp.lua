@@ -142,6 +142,10 @@ function ftp.get(to_ip,requestFileName,writeFileName,pretty)
       end
       --process file
       local file=io.open(writeFileName,"wb")
+      if not file then
+        mnp.log("FTP","Couldn't open file to write: "..writeFileName,2)
+        return false,"Couldn't open file to write"
+      end
       for l,line in pairs(filePackets) do
         for i=1,#line do
           file:write(line[i])
