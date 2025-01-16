@@ -15,6 +15,7 @@ function Package:new(dir)
 		return nil
 	end
 	local manifest = io.open(dir .. "/manifest")
+	if not manifest then return nil end
 	instance.name = manifest:read("l")
 	if not instance.name then
 		return nil
@@ -119,7 +120,9 @@ function apm.getPacket(server_ip, name, pretty)
 		end
 		for i = 1, #files do
 			local fdata = mnp.receive(server_ip, "ftp", 15)
-			if fdata[1] == "put" then
+			if not fdata then
+				--timeout
+			elseif fdata[1] == "put" then
 				local filename = fdata[3][1]
 				if not filename then
 					mnp.log("APM", "Failed to fetch filename of packet: ", 2)
@@ -136,6 +139,19 @@ function apm.getPacket(server_ip, name, pretty)
 	else
 		return false
 	end
+end
+function apm.getDefaultSources(server_ip)
+  if not server_ip then return nil end
+  mnp.send(server_ip,"apm",{"get-list"})
+  local rdata=mnp.receive(server_ip,"apm",30)
+  if not rdata then return nil
+  elseif rdata[1]=="default-list" then
+    if type(rdata[2])=="table" then
+      return rdata[2]
+    end
+    return nil
+  end
+  return nil
 end
 function apm.server(packageDir)
 	if not packageDir then

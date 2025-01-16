@@ -1,8 +1,7 @@
 local ver="0.0"
 local sources_file="/etc/apm-sources.st" --serialized table with sources
-local default_source_list="pkg.com" --default source list server
-local sources={} --sources[pname]=server
-
+local default_source_server="pkg.com" --default source list server
+local sources={} --sources[pname]={server,latest_version, installed_version}
 local mnp=require("cmnp")
 local shell=require("shell")
 local ip=require("ipv2")
@@ -69,8 +68,15 @@ end
 function update()
   cprint(">>Updating package list",0x6699FF)
   
-  --get sources from default_source_list
-
+  --get sources from default_source_server
+  local check,to_ip=mnp.checkAvailability(default_source_server)
+  if not check then
+    cprint("!!Error: Couldn't connect to default source server!",0xFF0000)
+    return false
+  else
+    cprint(">>Connecting to "..to_ip,0xFFFF33)
+    local default_sources=apm.getDefaultSources(to_ip)
+  end
 end
 function install(pname)
   if not mnp.isConnected() then cprint("!!Error: You should be connected to network!",0xFF0000) return false end
@@ -83,7 +89,7 @@ function install(pname)
     cprint("!!Error: Couldn't locate package "..pname.."!",0xFF0000)
     return false
   end
-  local dest=sources[pname]
+  local dest=sources[pname][1]
   local check,to_ip=mnp.checkAvailability(dest)
   if not check then
     cprint("!!Error: Couldn't connect to "..dest,0xFF0000)
