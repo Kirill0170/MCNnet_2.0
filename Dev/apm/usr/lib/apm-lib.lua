@@ -15,7 +15,9 @@ function Package:new(dir)
 		return nil
 	end
 	local manifest = io.open(dir .. "/manifest")
-	if not manifest then return nil end
+	if not manifest then
+		return nil
+	end
 	instance.name = manifest:read("l")
 	if not instance.name then
 		return nil
@@ -92,15 +94,38 @@ function apm.getInfo(server_ip, name)
 	end
 	return nil, "unknown"
 end
-function apm.getPacket(server_ip, name, pretty)
+function apm.getPackage(server_ip, name, pretty, current_ver, force)
 	if not require("ipv2").isIPv2(server_ip) or not name then
-		return false
+		return false, "invalid-arguments"
+	end
+	if not current_ver then
+		current_ver = ""
+	end
+	if not force then
+		force = true
 	end
 	local function cprint(text, color)
 		local gpu = require("component").gpu
 		gpu.setForeground(color)
 		print(text)
 		gpu.setForeground(0xFFFFFF)
+	end
+	local term = require("term")
+	--check latest
+	local latest_ver, err = apm.getInfo(server_ip, name)
+	if not latest_ver then
+		if err == "not found" and pretty then
+			cprint("!!Error: Package " .. name .. " not found at server " .. server_ip .. "!", 0xFF0000)
+		end
+		return false, err
+	end
+	if latest_ver == current_ver and not force then
+		cprint("??Already latest installed! Do you want to install anyways?", 0x33CC33)
+		term.write("[Y/n]: ")
+		local choice = io.read()
+		if choice == "n" or choice == "N" then
+			return false, "aborted"
+		end
 	end
 	mnp.send(server_ip, "apm", { "get-package", name }, true)
 	local rdata = mnp.receive(server_ip, "apm", 15)
@@ -110,12 +135,20 @@ function apm.getPacket(server_ip, name, pretty)
 	if rdata[1] == "transmission-start" then
 		local files = rdata[2]
 		local size = rdata[3]
-		--confirm size(maybe get-info?)
+		--confirm
+		if not force then
+			cprint("??Install " .. #files .. " files? Total download size: " .. size, 0xFF3333) --color
+			term.write("[Y/n]: ")
+			local choice = io.read()
+			if choice == "n" or choice == "N" then
+				return false, "aborted"
+			end
+		end
 		if not ftp.serverConnectionAwait(server_ip, 15) then
 			return false, "ftp-timeout"
 		end
 		if pretty then
-			cprint("Connected FTP with " .. server_ip, 0x33CC33)
+			cprint(">>Connected FTP with " .. server_ip, 0x33CC33)
 			cprint(">>Downloading " .. #files .. " files", 0xFFFF33)
 		end
 		for i = 1, #files do
@@ -131,27 +164,34 @@ function apm.getPacket(server_ip, name, pretty)
 						cprint(">>Getting " .. files[i], 0xFFFF33)
 					end
 					ftp.get(server_ip, filename, files[i], pretty)
+					if pretty then
+						cprint(">>Setting new version for " .. name .. ": " .. latest_ver, 0xFFFF33)
+					end
+					return true, "ok"
 				end
 			else
 				--invalid
 			end
 		end
 	else
-		return false
+		return false, "unknown"
 	end
 end
 function apm.getDefaultSources(server_ip)
-  if not server_ip then return nil end
-  mnp.send(server_ip,"apm",{"get-list"})
-  local rdata=mnp.receive(server_ip,"apm",30)
-  if not rdata then return nil
-  elseif rdata[1]=="default-list" then
-    if type(rdata[2])=="table" then
-      return rdata[2]
-    end
-    return nil
-  end
-  return nil
+	if not server_ip then
+		return nil
+	end
+	mnp.send(server_ip, "apm", { "get-list" })
+	local rdata = mnp.receive(server_ip, "apm", 30)
+	if not rdata then
+		return nil
+	elseif rdata[1] == "default-list" then
+		if type(rdata[2]) == "table" then
+			return rdata[2]
+		end
+		return nil
+	end
+	return nil
 end
 function apm.server(packageDir)
 	if not packageDir then
