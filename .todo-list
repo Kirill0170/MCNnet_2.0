@@ -1,5 +1,13 @@
-WDP
-Package manager: connect to package servers and download/update stuff uisng version control system
+W: Package manager: connect to package servers and download/update stuff uisng version control system
+MNP update
+-passwords for networks
+-c2cping domain support
+-move mnp files to /etc/mnp/
+-better domains
+-cm setdomain
+-node debug
+-node check if connected
+:34cd local ipv2
 MNP: network-wide admin operations:
   get_network
 --future--
