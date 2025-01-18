@@ -82,7 +82,7 @@ function apm.getInfo(server_ip, name)
 	if not require("ipv2").isIPv2(server_ip) or not name then
 		return nil, "arg fault"
 	end
-	mnp.send(server_ip, "apm", { "get-info" })
+	mnp.send(server_ip, "apm", {"get-info",name})
 	local rdata = mnp.receive(server_ip, "apm", 15)
 	if not rdata then
 		return nil, "timeout"
@@ -164,15 +164,15 @@ function apm.getPackage(server_ip, name, pretty, current_ver, force)
 						cprint(">>Getting " .. files[i], 0xFFFF33)
 					end
 					ftp.get(server_ip, filename, files[i], pretty)
-					if pretty then
-						cprint(">>Setting new version for " .. name .. ": " .. latest_ver, 0xFFFF33)
-					end
-					return true, "ok"
 				end
 			else
 				--invalid
 			end
 		end
+		if pretty then
+			cprint(">>Setting new version for " .. name .. ": " .. latest_ver, 0xFFFF33)
+		end
+		return true, "ok"
 	else
 		return false, "unknown"
 	end
