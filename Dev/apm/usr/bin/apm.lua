@@ -1,10 +1,10 @@
-local ver = "0.2.0"
+local ver = "0.4.0"
 local sources_file = "/etc/apm-sources.st" --serialized table with sources
 local default_source_server = "pkg.com" --default source list server
-local sources = {} --sources[pname]={server,latest_version, installed_version}
+local sources = {} --sources[pname]={server,latest_version, installed_version,info}
 local mnp = require("cmnp")
 local shell = require("shell")
-local ip = require("ipv2")
+local term=require("term")
 local apm = require("apm-lib")
 local component = require("component")
 local computer=require("computer")
@@ -32,20 +32,24 @@ end
 local function help()
 	cprint("Apt-like Package Manager", 0xFFCC33)
 	print("Version " .. ver)
+	print("Lib version "..apm.ver())
 	print("About: simple package manager for MCNnet")
 	cprint("Usage: apm [command]", 0x6699FF)
-	print("             install  [pname]")
-	print("             remove   [pname]")
-	print("             info     [pname]")
-	print("             addsrc   [hostname]")
-	print("             listsrc")
-	print("             rmsrc    [hostname]")
-  print("             fetchsrc")
-	print("             update")
-	print("             upgrade  <pname>")
+print([[             install  [pname]
+             remove   [pname]
+             info     [pname]
+             update
+             upgrade  <pname>
+Source management:
+             addsrc   [hostname]
+             rmsrc    [hostname]
+             listsrc
+             fetchsrc
+             printsrc]])
 	cprint("Options:", 0x33CC33)
 	print("--t=<int>      Timeout time")
 	print("-s             Silent (TODO)")
+	print("-f             Do forcefully")
 end
 
 function loadSources()
@@ -71,35 +75,18 @@ function saveSources()
   return true
 end
 
-function connection(dest, timeout)
-	if not mnp.isConnected() then
-		cprint("You should be connected to network", 0xFF0000)
+function info(pname)
+	if not sources[pname] then
+		cprint("!!Error: Couldn't locate package " .. pname .. "!", 0xFF0000)
 		return false
 	end
-	if timeout then
-		if not tonumber(timeout) then
-			cprint("--t should be given a number, defaulting to 10", 0xFFCC33)
-			timeout = 10
-		else
-			timeout = tonumber(timeout)
-		end
-	else
-		timeout = 10
-	end
-	local check, to_ip = mnp.checkAvailability(dest)
-	if not check then
-		cprint("Couldn't connect", 0xFF0000)
-		return false
-	end
-	local domain = ""
-	if mnp.checkHostname(dest) then
-		domain = dest
-	end
-	if domain ~= "" then
-		print("Connecting to " .. domain .. "(" .. to_ip .. ")")
-	else
-		print("Connecting to " .. to_ip)
-	end
+	local info=sources[pname]
+	cprint("Package: "..pname,0x336699)
+	cprint("Latest version: "..info[2])
+	cprint("Installed version: "..tostring(info[3]))
+	cprint("Server: "..info[1])
+	if not info[4] then info[4]="No description given." end
+	cprint("Info: "..tostring(info[4]))
 end
 function fetchDefaultSources()
   local check, to_ip = mnp.checkAvailability(default_source_server)
@@ -107,12 +94,12 @@ function fetchDefaultSources()
 		cprint("!!Error: Couldn't connect to default source server!", 0xFF0000)
 		return nil
 	else
-		cprint(">>Connecting to " .. to_ip, 0xFFFF33)
+		cprint(">>Connecting to " .. to_ip, 0x6699FF)
 		local default_sources = apm.getDefaultSources(to_ip)
     if default_sources then
       cprint(">>Successfully fetched default sources list!",0x33CC33)
       os.sleep(0.2)
-      cprint(">>Setting up..",0xFFFF33)
+      cprint(">>Setting up..",0x6699FF)
       os.sleep(0.2)
       for pname,info in pairs(default_sources) do
         sources[pname]=info
@@ -129,7 +116,7 @@ end
 function update()
 	cprint(">>Updating package list", 0x6699FF)
   --collect
-  cprint(">>Collecting servers..",0xFFFF33)
+  cprint(">>Collecting servers..",0x6699FF)
   local queue={}
   local len=0
   for pname,pinfo in pairs(sources) do
@@ -160,6 +147,7 @@ function update()
       end
     end
   end
+	saveSources()
   print(">>Completed, took "..ftime(computer.uptime()-start_time))
 end
 function install(pname,force)
@@ -168,7 +156,7 @@ function install(pname,force)
 		return false
 	end
   if not force then force=false end
-	cprint(">>Loading sources from " .. sources_file, 0xFFFF33)
+	cprint(">>Loading sources from " .. sources_file, 0x6699FF)
 	if not loadSources() then
 		cprint("!!Error: Couldn't load sources!", 0xFF0000)
 		return false
@@ -183,7 +171,7 @@ function install(pname,force)
 		cprint("!!Error: Couldn't connect to " .. dest, 0xFF0000)
 		return false
 	end
-	cprint(">>Connecting to " .. to_ip, 0xFFFF33)
+	cprint(">>Connecting to " .. to_ip, 0x6699FF)
   local start_time=computer.uptime()
 	local success, err = apm.getPackage(to_ip, pname, true,sources[pname][3],force) --NO FORCE
 	if not success then
@@ -193,8 +181,27 @@ function install(pname,force)
 		end
 		cprint("!!Error: Couldn't get packet: " .. err, 0xFF0000)
   else
+		sources[pname][3]=err
+		saveSources()
     cprint(">>Installed successfully! Took "..ftime(computer.uptime()-start_time),0x33CC33)
 	end
+end
+function upgrade()
+	cprint(">>Upgrading",0x6699FF)
+	update()
+	loadSources()
+	local queue={}
+	for pname,pinfo in pairs(sources) do
+		if tostring(pinfo[2])~=tostring(pinfo[3]) then
+			cprint(">>Updating:"..pname.." "..pinfo[3].." -> "..pinfo[2],0x336699)
+			if not queue[pinfo[1]] then
+				queue[pinfo[1]]={pname}
+			else
+				table.insert(queue[pinfo[1]],pname)
+			end
+		end
+	end
+	--ask
 end
 --main
 
@@ -217,6 +224,7 @@ elseif args[1]=="install" then install(args[2],ops["f"])
 elseif args[1]=="update" then update()
 elseif args[1]=="fetchsrc" then fetchDefaultSources()
 elseif args[1]=="printsrc" then print(ser.serialize(sources))
+elseif args[1]=="info" then info(args[2])
 else
 	help()
 end
@@ -224,5 +232,5 @@ end
 1. try packages.com 
 2. if not - use source list 
 if yes - update source list 
-
+list --upgradable
 ]]

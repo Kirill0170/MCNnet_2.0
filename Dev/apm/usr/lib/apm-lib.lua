@@ -1,4 +1,4 @@
-local ver = "0.2"
+local ver = "0.3.2"
 local fs = require("filesystem")
 local mnp = require("cmnp")
 local ftp = require("ftp")
@@ -66,7 +66,16 @@ function apm.readPackage(dir)
 	return Package:new(dir)
 end
 function apm.sendPackage(to_ip, package)
-	mnp.send(to_ip, "apm", { "transmission-start", package.files, package:checkFiles() })
+	local _,size=package:checkFiles()
+	mnp.send(to_ip, "apm", {"transmission-start",package.files,size})
+	local rdata=mnp.receive(to_ip,"apm",30)
+	if not rdata then
+		mnp.log("APM","Client timeouted while confirming installation.",1)
+		return false
+	elseif rdata[1]~="transmission-ready" then
+		mnp.log("APM","Client didn't confirm installation. what?",2)
+		return false
+	end
 	if not ftp.connection(to_ip) then
 		mnp.log("APM", "FTP connection fail with " .. to_ip)
 		return false
@@ -101,7 +110,7 @@ function apm.getPackage(server_ip, name, pretty, current_ver, force)
 	if not current_ver then
 		current_ver = ""
 	end
-	if not force then
+	if force==nil then
 		force = true
 	end
 	local function cprint(text, color)
@@ -109,6 +118,15 @@ function apm.getPackage(server_ip, name, pretty, current_ver, force)
 		gpu.setForeground(color)
 		print(text)
 		gpu.setForeground(0xFFFFFF)
+	end
+	local function fbytes(num)
+		local units = {"B", "KB", "MB", "GB", "TB"}
+    local unitIndex = 1
+    while num >= 1024 and unitIndex < #units do
+      num = num / 1024
+      unitIndex = unitIndex + 1
+    end
+    return string.format("%.1f %s", num, units[unitIndex])
 	end
 	local term = require("term")
 	--check latest
@@ -120,7 +138,7 @@ function apm.getPackage(server_ip, name, pretty, current_ver, force)
 		return false, err
 	end
 	if latest_ver == current_ver and not force then
-		cprint("??Already latest installed! Do you want to install anyways?", 0x33CC33)
+		cprint("??Already latest installed! Do you want to install anyways?", 0xFFFF33)
 		term.write("[Y/n]: ")
 		local choice = io.read()
 		if choice == "n" or choice == "N" then
@@ -137,19 +155,20 @@ function apm.getPackage(server_ip, name, pretty, current_ver, force)
 		local size = rdata[3]
 		--confirm
 		if not force then
-			cprint("??Install " .. #files .. " files? Total download size: " .. size, 0xFF3333) --color
+			cprint("??Install " .. #files .. " files? Total download size: "..fbytes(size), 0xFFFF33) --color
 			term.write("[Y/n]: ")
 			local choice = io.read()
 			if choice == "n" or choice == "N" then
 				return false, "aborted"
 			end
 		end
+		mnp.send(server_ip,"apm",{"transmission-ready"})
 		if not ftp.serverConnectionAwait(server_ip, 15) then
 			return false, "ftp-timeout"
 		end
 		if pretty then
 			cprint(">>Connected FTP with " .. server_ip, 0x33CC33)
-			cprint(">>Downloading " .. #files .. " files", 0xFFFF33)
+			cprint(">>Downloading " .. #files .. " files", 0x6699FF)
 		end
 		for i = 1, #files do
 			local fdata = mnp.receive(server_ip, "ftp", 15)
@@ -170,9 +189,9 @@ function apm.getPackage(server_ip, name, pretty, current_ver, force)
 			end
 		end
 		if pretty then
-			cprint(">>Setting new version for " .. name .. ": " .. latest_ver, 0xFFFF33)
+			cprint(">>Setting new version for " .. name .. ": " .. latest_ver, 0x6699FF)
 		end
-		return true, "ok"
+		return true, latest_ver
 	else
 		return false, "unknown"
 	end
