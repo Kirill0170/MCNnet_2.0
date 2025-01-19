@@ -1,4 +1,4 @@
-local ver = "0.6"
+local ver = "0.7"
 local sources_file = "/etc/apm-sources.st" --serialized table with sources
 local default_source_server = "pkg.com" --default source list server
 local sources = {} --sources[pname]={server,latest_version, installed_version,info,size}
@@ -67,7 +67,7 @@ print([[             install  [pname]
              update
              upgrade  <pname>
 Source management:
-             addsrc   [hostname]
+             addsrc   [hostname] [pname]
              rmsrc    [hostname]
              listsrc
              fetchsrc
@@ -302,6 +302,33 @@ function list(upgradable)
 		end
 	end
 end
+function remove(pname)
+	if not sources[pname] then
+		cprint("!!Error: No such package: "..pname,0xFF0000)
+		return false
+	end
+	sources[pname][3]=nil --not installed 
+	--remove files
+end
+function addSource(hostname,pname)
+	if not pname or not hostname then return false end
+	local check,to_ip=mnp.checkAvailability(hostname)
+	if not check then
+		cprint("!!Error: Can't connect to server: "..hostname,0xFF0000)
+		return false
+	end
+	local ver,info,size=apm.getInfo(to_ip,pname)
+	if ver then
+		sources[pname]={hostname,ver,nil,info,size}
+		cprint(">>Added package "..pname,0x33CC33)
+		return true
+	end
+	cprint("!!Error: Couldn't get package info!",0xFF0000)
+	return false
+end
+function removeSource(pname)
+	if pname then sources[pname]=nil end
+end
 --main
 
 if not require("filesystem").exists(sources_file) then
@@ -326,9 +353,13 @@ elseif args[1]=="fetchsrc" then fetchDefaultSources()
 elseif args[1]=="printsrc" then print(ser.serialize(sources))
 elseif args[1]=="info" then info(args[2])
 elseif args[1]=="list" then list(ops["upgradable"])
+elseif args[1]=="remove" then remove(args[2])
+elseif args[1]=="addsrc" then addSource(args[2],args[3])
+elseif args[1]=="rmsrc" then removeSource(args[2])
 else
 	help()
 end
+saveSources()
 --[[
 1. try packages.com 
 2. if not - use source list 
