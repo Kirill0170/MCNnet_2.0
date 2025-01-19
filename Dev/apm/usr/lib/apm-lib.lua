@@ -1,9 +1,25 @@
-local ver = "0.3.2"
+local ver = "0.3.4"
 local fs = require("filesystem")
 local mnp = require("cmnp")
 local ftp = require("ftp")
 local ser = require("serialization")
 local apm = {}
+
+local function cprint(text, color)
+	local gpu = require("component").gpu
+	gpu.setForeground(color)
+	print(text)
+	gpu.setForeground(0xFFFFFF)
+end
+local function fbytes(num)
+	local units = {"B", "KB", "MB", "GB", "TB"}
+	local unitIndex = 1
+	while num >= 1024 and unitIndex < #units do
+		num = num / 1024
+		unitIndex = unitIndex + 1
+	end
+	return string.format("%.1f %s", num, units[unitIndex])
+end
 
 Package = {}
 Package.__index = Package
@@ -24,6 +40,10 @@ function Package:new(dir)
 	end
 	instance.ver = manifest:read("l")
 	if not instance.ver then
+		return nil
+	end
+	instance.info= manifest:read("l")
+	if not instance.info then
 		return nil
 	end
 	local line = manifest:read("l")
@@ -97,7 +117,7 @@ function apm.getInfo(server_ip, name)
 		return nil, "timeout"
 	end
 	if rdata[1] == "info" then
-		return rdata[2], rdata[3]
+		return rdata[2], rdata[3],rdata[4] --ver,info,size
 	elseif rdata[1] == "not found" then
 		return nil, "not found"
 	end
@@ -112,21 +132,6 @@ function apm.getPackage(server_ip, name, pretty, current_ver, force)
 	end
 	if force==nil then
 		force = true
-	end
-	local function cprint(text, color)
-		local gpu = require("component").gpu
-		gpu.setForeground(color)
-		print(text)
-		gpu.setForeground(0xFFFFFF)
-	end
-	local function fbytes(num)
-		local units = {"B", "KB", "MB", "GB", "TB"}
-    local unitIndex = 1
-    while num >= 1024 and unitIndex < #units do
-      num = num / 1024
-      unitIndex = unitIndex + 1
-    end
-    return string.format("%.1f %s", num, units[unitIndex])
 	end
 	local term = require("term")
 	--check latest
@@ -244,7 +249,8 @@ function apm.server(packageDir)
 			if rdata[1] == "get-info" then
 				local name = rdata[2]
 				if packages[name] then
-					mnp.send(from_ip, "apm", { "info", packages[name].ver, packages[name]:checkFiles() })
+					local _,size=packages[name]:checkFiles()
+					mnp.send(from_ip, "apm", { "info", packages[name].ver, packages[name].info,fbytes(size)})
 				else
 					mnp.send(from_ip, "apm", { "not found" })
 				end

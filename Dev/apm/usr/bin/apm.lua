@@ -1,7 +1,7 @@
-local ver = "0.4.0"
+local ver = "0.5"
 local sources_file = "/etc/apm-sources.st" --serialized table with sources
 local default_source_server = "pkg.com" --default source list server
-local sources = {} --sources[pname]={server,latest_version, installed_version,info}
+local sources = {} --sources[pname]={server,latest_version, installed_version,info,size}
 local mnp = require("cmnp")
 local shell = require("shell")
 local term=require("term")
@@ -16,6 +16,32 @@ local function cprint(text, color)
 	gpu.setForeground(color)
 	print(text)
 	gpu.setForeground(0xFFFFFF)
+end
+
+local function bytesConvert(sizeStr)
+	local value, unit = sizeStr:match("(%d+%.?%d*)%s*(%a+)")
+	value = tonumber(value)
+	if unit == "B" then
+		return value
+	elseif unit == "KB" then
+		return value * 1024
+	elseif unit == "MB" then
+		return value * 1024 * 1024
+	elseif unit == "GB" then	
+		return value * 1024 * 1024 * 1024
+	else
+		error("Unsupported unit: " .. unit)
+	end
+end
+
+local function fbytes(num)
+	local units = {"B", "KB", "MB", "GB", "TB"}
+	local unitIndex = 1
+	while num >= 1024 and unitIndex < #units do
+		num = num / 1024
+		unitIndex = unitIndex + 1
+	end
+	return string.format("%.1f %s", num, units[unitIndex])
 end
 
 local function ftime(sec)
@@ -83,12 +109,20 @@ function info(pname)
 	local info=sources[pname]
 	cprint("Package: "..pname,0x336699)
 	cprint("Latest version: "..info[2])
-	cprint("Installed version: "..tostring(info[3]))
+	if info[3] then
+		cprint("Installed version: "..tostring(info[3]))
+	end
 	cprint("Server: "..info[1])
 	if not info[4] then info[4]="No description given." end
 	cprint("Info: "..tostring(info[4]))
+	if not info[5] then info[5]="Unknown" end
+	cprint("Size: "..tostring(info[5]))
 end
 function fetchDefaultSources()
+	if not mnp.isConnected() then
+		cprint("!!Error: You should be connected to network!", 0xFF0000)
+		return false
+	end
   local check, to_ip = mnp.checkAvailability(default_source_server)
 	if not check then
 		cprint("!!Error: Couldn't connect to default source server!", 0xFF0000)
@@ -114,6 +148,10 @@ function fetchDefaultSources()
 	end
 end
 function update()
+	if not mnp.isConnected() then
+		cprint("!!Error: You should be connected to network!", 0xFF0000)
+		return false
+	end
 	cprint(">>Updating package list", 0x6699FF)
   --collect
   cprint(">>Collecting servers..",0x6699FF)
@@ -135,12 +173,14 @@ function update()
       cprint("!!Error: Couldn't connect to "..server.."! Skipping all packages from it.",0xFF0000)
     else
       for _,pname in pairs(pnames) do
-        local latest_ver=apm.getInfo(server_ip,pname)
+        local latest_ver,info,size=apm.getInfo(server_ip,pname)
         if not latest_ver then
           cprint("!Error: Couldn't get version for "..pname,0xFF0000)
         elseif sources[pname][2]~=latest_ver then
           cprint(">>New version: "..pname.." "..sources[pname][2].." -> "..latest_ver,0x6699FF)
           sources[pname][2]=latest_ver
+					sources[pname][4]=info
+					sources[pname][5]=size
         else
           cprint(">>Not changed: "..pname.." "..latest_ver)
         end
@@ -148,7 +188,7 @@ function update()
     end
   end
 	saveSources()
-  print(">>Completed, took "..ftime(computer.uptime()-start_time))
+  cprint(">>Completed, took "..ftime(computer.uptime()-start_time),0x33CC33)
 end
 function install(pname,force)
 	if not mnp.isConnected() then
@@ -173,7 +213,7 @@ function install(pname,force)
 	end
 	cprint(">>Connecting to " .. to_ip, 0x6699FF)
   local start_time=computer.uptime()
-	local success, err = apm.getPackage(to_ip, pname, true,sources[pname][3],force) --NO FORCE
+	local success, err = apm.getPackage(to_ip, pname, true,sources[pname][3],force)
 	if not success then
 		if err == "aborted" then
 			cprint("Aborted")
@@ -187,13 +227,18 @@ function install(pname,force)
 	end
 end
 function upgrade()
+	if not mnp.isConnected() then
+		cprint("!!Error: You should be connected to network!", 0xFF0000)
+		return false
+	end
 	cprint(">>Upgrading",0x6699FF)
 	update()
-	loadSources()
 	local queue={}
+	local total_size=0
 	for pname,pinfo in pairs(sources) do
-		if tostring(pinfo[2])~=tostring(pinfo[3]) then
+		if tostring(pinfo[2])~=tostring(pinfo[3]) and pinfo[3] then
 			cprint(">>Updating:"..pname.." "..pinfo[3].." -> "..pinfo[2],0x336699)
+			if pinfo[5] then total_size=total_size+bytesConvert(pinfo[5]) end
 			if not queue[pinfo[1]] then
 				queue[pinfo[1]]={pname}
 			else
@@ -202,6 +247,42 @@ function upgrade()
 		end
 	end
 	--ask
+	if total_size==0 then
+		cprint(">>Nothing to upgrade",0x33CC33)
+		return
+	end
+	cprint("??Download "..fbytes(total_size).." of packages?",0xFFFF33)
+	term.write("[Y/n]: ")
+	local choice=io.read()
+	if choice =="n" or choice=="N" then
+		print("Aborted.")
+		return
+	end
+	local start_time=computer.uptime()
+	for server,packages in pairs(queue) do
+		--check dest
+		local check,server_ip=mnp.checkAvailability(server)
+		if check then
+			cprint(">>Connecting to " .. server_ip, 0x6699FF)
+			for _,pname in pairs(packages) do
+				local success, err = apm.getPackage(server_ip, pname, true,sources[pname][3],true)
+				if not success then
+					if err == "aborted" then
+						cprint("Aborted")
+						return
+					end
+					cprint("!Error: Couldn't get packet: " .. err, 0xFF0000)
+				else
+					sources[pname][3]=err
+					saveSources()
+				end
+			end
+		else
+			cprint("!Error: Server unavailable: "..server,0xFF0000)
+		end
+	end
+	saveSources()
+  cprint(">>Upgraded successfully! Took "..ftime(computer.uptime()-start_time),0x33CC33)
 end
 --main
 
@@ -222,6 +303,7 @@ elseif ops["h"] or ops["help"] then
 	help()
 elseif args[1]=="install" then install(args[2],ops["f"])
 elseif args[1]=="update" then update()
+elseif args[1]=="upgrade" then upgrade()
 elseif args[1]=="fetchsrc" then fetchDefaultSources()
 elseif args[1]=="printsrc" then print(ser.serialize(sources))
 elseif args[1]=="info" then info(args[2])
