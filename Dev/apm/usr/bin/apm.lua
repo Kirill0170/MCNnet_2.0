@@ -1,4 +1,4 @@
-local ver = "0.5"
+local ver = "0.6"
 local sources_file = "/etc/apm-sources.st" --serialized table with sources
 local default_source_server = "pkg.com" --default source list server
 local sources = {} --sources[pname]={server,latest_version, installed_version,info,size}
@@ -226,7 +226,7 @@ function install(pname,force)
     cprint(">>Installed successfully! Took "..ftime(computer.uptime()-start_time),0x33CC33)
 	end
 end
-function upgrade()
+function upgrade(force)
 	if not mnp.isConnected() then
 		cprint("!!Error: You should be connected to network!", 0xFF0000)
 		return false
@@ -236,7 +236,7 @@ function upgrade()
 	local queue={}
 	local total_size=0
 	for pname,pinfo in pairs(sources) do
-		if tostring(pinfo[2])~=tostring(pinfo[3]) and pinfo[3] then
+		if (tostring(pinfo[2])~=tostring(pinfo[3]) and pinfo[3]) or (pinfo[3] and force) then
 			cprint(">>Updating:"..pname.." "..pinfo[3].." -> "..pinfo[2],0x336699)
 			if pinfo[5] then total_size=total_size+bytesConvert(pinfo[5]) end
 			if not queue[pinfo[1]] then
@@ -274,7 +274,6 @@ function upgrade()
 					cprint("!Error: Couldn't get packet: " .. err, 0xFF0000)
 				else
 					sources[pname][3]=err
-					saveSources()
 				end
 			end
 		else
@@ -283,6 +282,25 @@ function upgrade()
 	end
 	saveSources()
   cprint(">>Upgraded successfully! Took "..ftime(computer.uptime()-start_time),0x33CC33)
+end
+function list(upgradable)
+	for pname,pinfo in pairs(sources) do
+		if upgradable then
+			if pinfo[2]~=pinfo[3] and pinfo[3] then
+				cprint(pname.." "..pinfo[3].." can be upgraded to "..pinfo[2],0xFFCC33)
+			end
+		else
+			if pinfo[3] then
+				if pinfo[2]~=pinfo[3] then
+					cprint(pname.." "..pinfo[3].." ("..pinfo[2]..")",0xFFCC33)
+				else
+					cprint(pname.." "..pinfo[3].." ("..pinfo[2]..")",0x336600)
+				end
+			else
+				cprint(pname.." "..pinfo[2],0xCCCCCC)
+			end
+		end
+	end
 end
 --main
 
@@ -303,10 +321,11 @@ elseif ops["h"] or ops["help"] then
 	help()
 elseif args[1]=="install" then install(args[2],ops["f"])
 elseif args[1]=="update" then update()
-elseif args[1]=="upgrade" then upgrade()
+elseif args[1]=="upgrade" then upgrade(ops["f"])
 elseif args[1]=="fetchsrc" then fetchDefaultSources()
 elseif args[1]=="printsrc" then print(ser.serialize(sources))
 elseif args[1]=="info" then info(args[2])
+elseif args[1]=="list" then list(ops["upgradable"])
 else
 	help()
 end
@@ -316,3 +335,4 @@ end
 if yes - update source list 
 list --upgradable
 ]]
+--sources[pname]={server,latest_version, installed_version,info,size}
