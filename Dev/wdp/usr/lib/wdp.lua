@@ -73,7 +73,7 @@ function wdp.send(to_ip,filename)--add file check
     mnp.log("WDP","Disconnecting "..to_ip)
     return false
   end
-  ftp.serverConnection(to_ip,filename)
+  ftp.serverConnection(to_ip,false,filename)
   mnp.log("WDP","Disconnecting "..to_ip)
   return true
 end

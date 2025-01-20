@@ -1,7 +1,7 @@
 local mnp=require("cmnp")
 local ip=require("ipv2")
 local ser=require("serialization")
-local version="1.4.3"
+local version="1.4.4"
 local ftp={}
 ftp.maxPacketLen=2048
 function ftp.ver() return version end
@@ -142,6 +142,10 @@ function ftp.get(to_ip,requestFileName,writeFileName,pretty)
       end
       --process file
       local file=io.open(writeFileName,"wb")
+      if not file then
+        mnp.log("FTP","Couldn't open file to write: "..writeFileName,2)
+        return false,"Couldn't open file to write"
+      end
       for l,line in pairs(filePackets) do
         for i=1,#line do
           file:write(line[i])
@@ -265,7 +269,8 @@ function ftp.serverConnectionInit(to_ip,rdata)
     return true
   else mnp.log("FTP","Packet type is not init! "..rdata[1],1) return false end
 end
-function ftp.serverConnection(to_ip,only)
+function ftp.serverConnection(to_ip,pretty,only)
+  if not pretty then pretty=false end
   mnp.log("FTP","Server connection with "..to_ip)
   while true do
     local rdata=mnp.receive(to_ip,"ftp",30)
@@ -282,7 +287,7 @@ function ftp.serverConnection(to_ip,only)
         mnp.log("FTP","Sent file: "..rdata[3][1].." to "..to_ip)
       elseif rdata[1]=="put" then
         local filename=rdata[3][1]
-        ftp.get(to_ip,filename,filename)
+        ftp.get(to_ip,filename,filename,pretty)
         mnp.log("FTP","Downloaded file: "..filename.." from "..to_ip)
       elseif rdata[1]=="end" then
         mnp.log("FTP","Ended connection with "..to_ip)

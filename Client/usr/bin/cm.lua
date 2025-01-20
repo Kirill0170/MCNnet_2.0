@@ -1,5 +1,5 @@
 --MNP CONNECTION MANAGER for client
-local ver="ALPHA 0.9.6"
+local ver="ALPHA 0.9.7"
 local filename="/usr/.cm_last_netname"
 local mnp=require("cmnp")
 local ip=require("ipv2")
@@ -46,6 +46,19 @@ local function versions()
   print("Version "..ver)
   mnp.logVersions()
 end
+
+local function savePrevName(name)
+  local file=io.open(filename,"w")
+  file:write(name)
+  file:close()
+end
+local function loadPrevName()
+  local file=io.open(filename,"r")
+  if not file then return nil end
+  local name=file:read("*a")
+  file:close()
+  return name
+end
 local function status()
   local this_ip=os.getenv("this_ip")
   if not this_ip then
@@ -55,6 +68,7 @@ local function status()
   print("This computer's IP is: "..this_ip)
   if mnp.isConnected(true) then
     cprint("Connected!",0x33CC33)
+    cprint("Network name: "..loadPrevName(),0x33CC33)
   else
     cprint("Not connected.",0xFF0000)
   end
@@ -72,18 +86,6 @@ local function printDist(str1,str2)
   gpu.setForeground(0xFFFFFF)
 end
 
-local function savePrevName(name)
-  local file=io.open(filename,"w")
-  file:write(name)
-  file:close()
-end
-local function loadPrevName()
-  local file=io.open(filename,"r")
-  if not file then return nil end
-  local name=file:read("*a")
-  file:close()
-  return name
-end
 
 local function search(s,p)
   print("Searching for networks...")
