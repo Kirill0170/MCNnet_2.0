@@ -1,4 +1,4 @@
-W: Package manager: connect to package servers and download/update stuff uisng version control system
+W: Package manager: package servers send updates to listserv
 /etc/apm/sources.list
 MNP update
 -passwords for networks

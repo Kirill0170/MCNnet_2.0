@@ -1,6 +1,7 @@
 --server with list of sources
+--sources[pname]={server,latest_version,nil,info,size,files}
 local sources={
-  package1={"example.com","1.0"}
+  package1={"example.com","1.0",nil,"An Example Package","25.0 B","/home/exampleProgram.lua"}
 }
 local domain=""
 local cmnp=require("cmnp")

@@ -1,7 +1,7 @@
-local ver = "0.8"
+local ver = "1.0"
 local sources_file = "/etc/apm-sources.st" --serialized table with sources
 local default_source_server = "pkg.com" --default source list server
-local sources = {} --sources[pname]={server,latest_version, installed_version,info,size}
+local sources = {} --sources[pname]={server,latest_version, installed_version,info,size,files}
 local mnp = require("cmnp")
 local shell = require("shell")
 local term=require("term")
@@ -67,9 +67,10 @@ print([[             install  [pname]
              info     [pname]
              update
              upgrade  <pname>
+             list --<upgradable/installed> 
 Source management:
              addsrc   [hostname] [pname]
-             rmsrc    [hostname]
+             rmsrc    [pname]
              listsrc
              fetchsrc
              printsrc]])
@@ -118,9 +119,10 @@ function info(pname)
 	cprint("Info: "..tostring(info[4]))
 	if not info[5] then info[5]="Unknown" end
 	cprint("Size: "..tostring(info[5]))
-  if not info[6] then info[6]={"Unknown files"} end
+  if not info[6] then info[6]={"Unknown files"}
+	else print("Files:") end
   for _,file in pairs(info[6]) do
-    print(file)
+    print("  "..file)
   end
 end
 function fetchDefaultSources()
@@ -183,13 +185,13 @@ function update()
           cprint("!Error: Couldn't get version for "..pname,0xFF0000)
         elseif sources[pname][2]~=latest_ver then
           cprint(">>New version: "..pname.." "..sources[pname][2].." -> "..latest_ver,0x6699FF)
-          sources[pname][2]=latest_ver
-					sources[pname][4]=info
-					sources[pname][5]=size
-          sources[pname][6]=files
         else
           cprint(">>Not changed: "..pname.." "..latest_ver)
         end
+				sources[pname][2]=latest_ver
+				sources[pname][4]=info
+				sources[pname][5]=size
+				sources[pname][6]=files
       end
     end
   end
@@ -284,11 +286,15 @@ function upgrade(force)
 	saveSources()
   cprint(">>Upgraded successfully! Took "..ftime(computer.uptime()-start_time),0x33CC33)
 end
-function list(upgradable)
+function list(upgradable,installed)
 	for pname,pinfo in pairs(sources) do
 		if upgradable then
 			if pinfo[2]~=pinfo[3] and pinfo[3] then
 				cprint(pname.." "..pinfo[3].." can be upgraded to "..pinfo[2],0xFFCC33)
+			end
+		elseif installed then
+			if pinfo[3] then
+				cprint(pname.." "..pinfo[3].." ("..pinfo[2]..")",0x336600)
 			end
 		else
 			if pinfo[3] then
@@ -307,6 +313,22 @@ function remove(pname)
 	if not sources[pname] then
 		cprint("!!Error: No such package: "..pname,0xFF0000)
 		return false
+	end
+	local files=sources[pname][6]
+	if not files then
+		cprint("!!Error: Unknown files of package "..pname,0xFF0000)
+		sources[pname][3]=nil
+		return false
+	end
+	for _,file in pairs(files) do
+		cprint("  "..file,0xCCCCCC)
+	end
+	cprint("??Remove those files?",0xFFFF33)
+	term.write("[Y/n]")
+	local choice=io.read()
+	if choice=="n" or choice=="N" then
+		print("Aborted. Let the files live.")
+		return
 	end
 	sources[pname][3]=nil --not installed 
 	--remove files
@@ -327,9 +349,9 @@ function addSource(hostname,pname)
 		cprint("!!Error: Can't connect to server: "..hostname,0xFF0000)
 		return false
 	end
-	local ver,info,size=apm.getInfo(to_ip,pname)
+	local ver,info,size,files=apm.getInfo(to_ip,pname)
 	if ver then
-		sources[pname]={hostname,ver,nil,info,size}
+		sources[pname]={hostname,ver,nil,info,size,files}
 		cprint(">>Added package "..pname,0x33CC33)
 		return true
 	end
@@ -365,7 +387,7 @@ elseif args[1]=="upgrade" then upgrade(ops["f"])
 elseif args[1]=="fetchsrc" then fetchDefaultSources()
 elseif args[1]=="printsrc" then print(ser.serialize(sources))
 elseif args[1]=="info" then info(args[2])
-elseif args[1]=="list" then list(ops["upgradable"])
+elseif args[1]=="list" then list(ops["upgradable"],ops["installed"])
 elseif args[1]=="remove" then remove(args[2])
 elseif args[1]=="addsrc" then addSource(args[2],args[3])
 elseif args[1]=="rmsrc" then removeSource(args[2])

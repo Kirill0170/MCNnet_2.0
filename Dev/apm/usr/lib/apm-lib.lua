@@ -1,4 +1,4 @@
-local ver = "0.3.4"
+local ver = "0.4"
 local fs = require("filesystem")
 local mnp = require("cmnp")
 local ftp = require("ftp")
@@ -92,6 +92,9 @@ function apm.sendPackage(to_ip, package)
 	if not rdata then
 		mnp.log("APM","Client timeouted while confirming installation.",1)
 		return false
+	elseif rdata[1]=="transmission-cancel" then
+		mnp.log("APM","Client cancelled installation.",2)
+		return false
 	elseif rdata[1]~="transmission-ready" then
 		mnp.log("APM","Client didn't confirm installation. what?",2)
 		return false
@@ -158,12 +161,23 @@ function apm.getPackage(server_ip, name, pretty, current_ver, force)
 	if rdata[1] == "transmission-start" then
 		local files = rdata[2]
 		local size = rdata[3]
+		if not files or not size then
+			cprint("!!Error: Faulty packet during transmission-start!",0xFF0000)
+			return false
+		end
 		--confirm
 		if not force then
+			if pretty then
+				cprint(">>Files to install:",0x6699FF)
+				for _,file in pairs(files) do
+					cprint("  "..file,0xCCCCCC)
+				end
+			end
 			cprint("??Install " .. #files .. " files? Total download size: "..fbytes(size), 0xFFFF33) --color
 			term.write("[Y/n]: ")
 			local choice = io.read()
 			if choice == "n" or choice == "N" then
+				mnp.send(server_ip,"apm",{"transmission-cancel"})
 				return false, "aborted"
 			end
 		end
