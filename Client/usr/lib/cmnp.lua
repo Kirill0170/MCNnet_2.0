@@ -1,19 +1,20 @@
 --Mcn-net Networking Protocol for Client BETA
 --Modem is required.
 local dolog=false
-local networkSaveFileName="/etc/mnpSavedNetworks.st"-- array[netname]=<uuid-address>
-local routeSaveFileName="/etc/mnpSavedRoutes.st" --array[to_ip]=<route>
-local domainSaveFileName="/etc/mnpSavedDomains.st" --array[domain]={<ip>,<route>}
+local networkSaveFileName="/etc/mnp/SavedNetworks.st"-- array[netname]=<uuid-address>
+local routeSaveFileName="/etc/mnp/SavedRoutes.st" --array[to_ip]=<route>
+local domainSaveFileName="/etc/mnp/SavedDomains.st" --array[domain]={<ip>,<route>}
 local component=require("component")
 local computer=require("computer")
 local ser=require("serialization")
 local netpacket = require("netpacket")
 local modem=component.modem
+local fs=require("filesystem")
 local thread=require("thread")
 local event=require("event")
 local ip=require("ipv2")
 local gpu=component.gpu
-local mnp_ver="2.5.3 BETA"
+local mnp_ver="2.5.4 BETA"
 local mncp_ver="2.4.2 INDEV"
 local forbidden_vers={}
 forbidden_vers["mnp"]={"2.21 EXPERIMENTAL"}
@@ -58,6 +59,9 @@ function mnp.log(mod,text, crit)
 	end
 end
 --init-----------------------------------
+if not fs.exists('/etc/apm') then
+  fs.makeDirectory('/etc/apm')
+end
 function mnp.logVersions() 
 	mnp.log("MNP","MNP version " .. mnp_ver)
 	mnp.log("MNP","MNCP version " .. mncp_ver)
@@ -158,7 +162,7 @@ function mnp.openPorts(plog)
   return true
 end
 function mnp.toggleLog(change)
-  if type(change)=="boolean" then 
+  if type(change)=="boolean" then
     dolog=change
     return true
   else return false end
@@ -169,6 +173,9 @@ function mnp.loadSavedNodes()
   local file=io.open(networkSaveFileName,"r")
   if not file then --initialize file
     file=io.open(networkSaveFileName,"w")
+    if not file then
+      error("Can't open file to write: "..networkSaveFileName) 
+    end
     file:write(ser.serialize({}))
     file:close()
     return {}
@@ -188,6 +195,9 @@ end
 function mnp.saveNodes(table)
   if type(table)~="table" then return false end
   local file=io.open(networkSaveFileName, "w")
+  if not file then
+    error("Can't open file to write: "..networkSaveFileName) 
+  end
   file:write(ser.serialize(table))
   file:close()
   return true
@@ -210,6 +220,9 @@ function mnp.loadRoutes()
   local file=io.open(routeSaveFileName,"r")
   if not file then --initialize file
     file=io.open(routeSaveFileName,"w")
+    if not file then
+      error("Can't open file to write: "..routeSaveFileName)
+    end
     file:write(ser.serialize({}))
     file:close()
     return {}
@@ -220,6 +233,9 @@ function mnp.loadRoutes()
   --checks
   if type(savedata)~="table" then
     file=io.open(routeSaveFileName,"w")
+    if not file then
+      error("Can't open file to write: "..routeSaveFileName) 
+    end
     file:write(ser.serialize({}))
     file:close()
     return {}
@@ -242,6 +258,9 @@ function mnp.saveRoute(to_ip,route)
   local saved=mnp.loadRoutes()
   saved[to_ip]=route
   local file=io.open(routeSaveFileName,"w")
+  if not file then
+    error("Can't open file to write: "..routeSaveFileName)
+  end
   file:write(ser.serialize(saved))
   file:close()
   return true
@@ -251,6 +270,9 @@ function mnp.loadDomains()
   local file=io.open(domainSaveFileName,"r")
   if not file then --initialize file
     file=io.open(domainSaveFileName,"w")
+    if not file then
+      error("Can't open file to write: "..domainSaveFileName)
+    end
     file:write(ser.serialize({}))
     file:close()
     return {}
@@ -261,6 +283,9 @@ function mnp.loadDomains()
   --checks
   if type(savedata)~="table" then 
     file=io.open(domainSaveFileName,"w")
+    if not file then
+      error("Can't open file to write: "..domainSaveFileName)
+    end
     file:write(ser.serialize({}))
     file:close()
     return {}
@@ -277,6 +302,9 @@ function mnp.saveDomain(domain,to_ip,route)
   local saved=mnp.loadDomains()
   saved[domain]={to_ip,route}
   local file=io.open(domainSaveFileName,"w")
+  if not file then
+    error("Can't open file to write: "..domainSaveFileName)
+  end
   file:write(ser.serialize(saved))
   file:close()
   return true
