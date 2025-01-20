@@ -1,4 +1,4 @@
-local ver = "0.7"
+local ver = "0.8"
 local sources_file = "/etc/apm-sources.st" --serialized table with sources
 local default_source_server = "pkg.com" --default source list server
 local sources = {} --sources[pname]={server,latest_version, installed_version,info,size}
@@ -9,6 +9,7 @@ local apm = require("apm-lib")
 local component = require("component")
 local computer=require("computer")
 local ser = require("serialization")
+local fs=require("filesystem")
 local gpu = component.gpu
 
 local function cprint(text, color)
@@ -117,6 +118,10 @@ function info(pname)
 	cprint("Info: "..tostring(info[4]))
 	if not info[5] then info[5]="Unknown" end
 	cprint("Size: "..tostring(info[5]))
+  if not info[6] then info[6]={"Unknown files"} end
+  for _,file in pairs(info[6]) do
+    print(file)
+  end
 end
 function fetchDefaultSources()
 	if not mnp.isConnected() then
@@ -173,7 +178,7 @@ function update()
       cprint("!!Error: Couldn't connect to "..server.."! Skipping all packages from it.",0xFF0000)
     else
       for _,pname in pairs(pnames) do
-        local latest_ver,info,size=apm.getInfo(server_ip,pname)
+        local latest_ver,info,size,files=apm.getInfo(server_ip,pname)
         if not latest_ver then
           cprint("!Error: Couldn't get version for "..pname,0xFF0000)
         elseif sources[pname][2]~=latest_ver then
@@ -181,6 +186,7 @@ function update()
           sources[pname][2]=latest_ver
 					sources[pname][4]=info
 					sources[pname][5]=size
+          sources[pname][6]=files
         else
           cprint(">>Not changed: "..pname.." "..latest_ver)
         end
@@ -196,11 +202,6 @@ function install(pname,force)
 		return false
 	end
   if not force then force=false end
-	cprint(">>Loading sources from " .. sources_file, 0x6699FF)
-	if not loadSources() then
-		cprint("!!Error: Couldn't load sources!", 0xFF0000)
-		return false
-	end
 	if not sources[pname] then
 		cprint("!!Error: Couldn't locate package " .. pname .. "!", 0xFF0000)
 		return false
@@ -309,6 +310,15 @@ function remove(pname)
 	end
 	sources[pname][3]=nil --not installed 
 	--remove files
+  if not sources[pname][6] then return false end
+  cprint(">>Removing "..#sources[pname][6].." files...",0xFFFF33)
+  for _,file in pairs(sources[pname][6]) do
+    if fs.exists(file) then
+      cprint(">>Removing "..file,0xFFFF33)
+      fs.remove(file)
+    end
+  end
+  return true
 end
 function addSource(hostname,pname)
 	if not pname or not hostname then return false end
@@ -331,7 +341,7 @@ function removeSource(pname)
 end
 --main
 
-if not require("filesystem").exists(sources_file) then
+if not fs.exists(sources_file) then
 	local file = io.open(sources_file, "w")
 	if not file then
 		error("Couldn't open source file to write: " .. sources_file)
@@ -339,7 +349,10 @@ if not require("filesystem").exists(sources_file) then
 	file:write(ser.serialize({})):close()
 end
 
-loadSources()
+if not loadSources() then
+  cprint("!!Error: Couldn't load sources!", 0xFF0000)
+  return false
+end
 
 local args, ops = shell.parse(...)
 if not args and not ops then
@@ -366,4 +379,4 @@ saveSources()
 if yes - update source list 
 list --upgradable
 ]]
---sources[pname]={server,latest_version, installed_version,info,size}
+--sources[pname]={server,latest_version, installed_version,info,size,files}

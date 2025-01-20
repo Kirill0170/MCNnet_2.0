@@ -117,7 +117,7 @@ function apm.getInfo(server_ip, name)
 		return nil, "timeout"
 	end
 	if rdata[1] == "info" then
-		return rdata[2], rdata[3],rdata[4] --ver,info,size
+		return rdata[2], rdata[3],rdata[4],rdata[5] --ver,info,size,files
 	elseif rdata[1] == "not found" then
 		return nil, "not found"
 	end
@@ -250,7 +250,7 @@ function apm.server(packageDir)
 				local name = rdata[2]
 				if packages[name] then
 					local _,size=packages[name]:checkFiles()
-					mnp.send(from_ip, "apm", { "info", packages[name].ver, packages[name].info,fbytes(size)})
+					mnp.send(from_ip, "apm", { "info", packages[name].ver, packages[name].info,fbytes(size),packages[name].files})
 				else
 					mnp.send(from_ip, "apm", { "not found" })
 				end
