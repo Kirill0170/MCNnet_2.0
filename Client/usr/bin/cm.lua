@@ -1,5 +1,5 @@
 --MNP CONNECTION MANAGER for client
-local ver="ALPHA 0.9.7"
+local ver="ALPHA 0.9.8"
 local filename="/usr/.cm_last_netname"
 local mnp=require("cmnp")
 local ip=require("ipv2")
@@ -9,6 +9,7 @@ local component=require("component")
 local gpu=component.gpu
 
 local function cprint(text,color)
+  if not color then print(text) end
   gpu.setForeground(color)
   print(text)
   gpu.setForeground(0xFFFFFF)
@@ -21,18 +22,18 @@ local function help()
   cprint("Usage: cm [action] <options>",0x6699FF)
   cprint("Actions:",0x33CC33)
   local help_cmds=[[
-ver                   version info
-help                  show this message
-netsearch (ns)        search for networks
-connect <name>        connect to network by name;
-                          should have connected to this network previously
-                          use 'cm connect' to connect to previous network
-status (s)            current connection status
-disconnect (d)        disconnect from network
-reconnect  (rc)       disconnect & connect
-nping <n> <t>        ping node
-c2cping <n> <t> [ip] Client-to-Client pinging
-reset                reset all saved MNP data
+ver                    version info
+help                   show this message
+netsearch (ns)         search for networks
+connect <name>         connect to network by name;
+                           should have connected to this network previously
+                           use 'cm connect' to connect to previous network
+status (s)             current connection status
+disconnect (d)         disconnect from network
+reconnect  (rc)        disconnect & connect
+nping (np)<n> <t>      ping node
+c2cping (ping) [dest]  Client-to-Client pinging
+reset                  reset all saved MNP data
   ]]
   print(help_cmds)
   cprint("Options:",0x33CC33)
@@ -87,7 +88,7 @@ local function printDist(str1,str2)
 end
 
 
-local function search(s,p)
+local function netsearch(s,p)
   print("Searching for networks...")
   local rsi=mnp.networkSearch(5,true) --res[netname]={from,dist}
   if not next(rsi) then cprint("No networks found",0xFFCC33)
@@ -191,20 +192,15 @@ local function pingNode(n,t)
     print("     max: "..max.."s min: "..min.."s avg: "..avg.."s")
   end
 end
-local function c2cping(n,t,to_ip)
+local function c2cping(n,t,dest)
   if not mnp.isConnected() then
     cprint("Not connected.",0xFF0000)
     return false
   end
-  if not ip.isIPv2(to_ip) then cprint("IPv2 needed to ping!",0xFF0000) return false end
-  if not mnp.getSavedRoute(to_ip) then
-    cprint("No route to "..to_ip.." found. searching...",0xFFCC33)
-    if not mnp.search(to_ip) then
-      cprint("Failed search",0xFFCC33)
-      return false
-    end
+  local check,to_ip=mnp.checkAvailability(dest)
+  if not check then
+    cprint("Couldn't find host!",0xFF0000)
   end
-  if not mnp.getSavedRoute(to_ip) then cprint("Couldn't get route for "..to_ip,2) return false end
   print("Client-to-Client pinging "..to_ip)
   if n==1 then
     local time=mnp.mncp.c2cPing(to_ip,tonumber(t))
@@ -253,9 +249,9 @@ else ops["n"]=10 end
 
 if args[1]=="disconnect" or args[1]=="d" then disconnect()
 elseif args[1]=="status" or args[1]=="s" then status()
-elseif args[1]=="netsearch" or args[1]=="ns" then search(ops["s"],ops["p"])
+elseif args[1]=="netsearch" or args[1]=="ns" then netsearch(ops["s"],ops["p"])
 elseif args[1]=="nping" or args[1]=="np" then pingNode(ops["n"],ops["t"])
-elseif args[1]=="c2cping" then c2cping(ops["n"],ops["t"],args[2])
+elseif args[1]=="c2cping" or args[1]=="ping" then c2cping(ops["n"],ops["t"],args[2])
 elseif args[1]=="connect" or args[1]=="c" then connect(args[2])
 elseif args[1]=="reconnect" or args[1]=="rc" then reconnect()
 elseif args[1]=="reset" then reset()

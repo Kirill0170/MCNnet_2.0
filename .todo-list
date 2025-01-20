@@ -1,8 +1,6 @@
 W: Package manager: package servers send updates to listserv
-/etc/apm/sources.list
 MNP update
 -passwords for networks
--c2cping domain support
 -move mnp files to /etc/mnp/
 -better domains
 -cm setdomain
