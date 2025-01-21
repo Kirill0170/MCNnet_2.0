@@ -1,5 +1,5 @@
 --Node (beta)
-local node_ver="[beta2 build6]"
+local node_ver="[beta3 devbuild1]"
 local configFile="nodeconfig"
 local component=require("component")
 local computer=require("computer")
@@ -13,19 +13,25 @@ local netpacket=require("netpacket")
 local ip=require("ipv2")
 Threads={}
 ThreadStatus={}
+local passlog=false
 local function packetThread(thread_id)
   local run=true
   mnp.log("Worker"..thread_id,"Online")
+  local str="/w"..thread_id
   while run do
     local id,from,port,mtype,np,data=event.pullMultiple("packet"..thread_id,"stop"..thread_id)
     if id=="stop"..thread_id then run=false break end
     ThreadStatus[thread_id]="busy"
-    if not np then mnp.log("NODE","No packet info received") return false end
+    if not np then mnp.log("Worker"..thread_id,"No packet info received") return false end
     np=ser.unserialize(np)
     if data then data=ser.unserialize(data) end
     if not netpacket.checkPacket(np) then
-      mnp.log("NODE","Incorrect packet received",1)
-      return false 
+      mnp.log("Worker"..thread_id,"Incorrect packet received",1)
+      ThreadStatus[thread_id]="idle"
+    end
+    if not ip.findIP(from) and np["route"][0]~="0000:0000" then
+      mnp.log("Worker"..thread_id,"Non-connected client! IP: "..np["route"][0].." mtype: "..mtype,2)
+      ThreadStatus[thread_id]="idle"
     end
     if mtype=="netconnect" then
       mnp.networkConnect(from,np,data)
@@ -40,6 +46,9 @@ local function packetThread(thread_id)
     elseif mtype=="setdomain" then
       mnp.setDomain(np,data)
     else --data
+      if passlog then
+        mnp.log("PASS"..str,np["route"][0].."->"..np["t"].." "..ser.serialize(data))
+      end
       mnp.pass(port,mtype,np,data)
     end
     ThreadStatus[thread_id]="idle"
@@ -128,6 +137,9 @@ while true do
       mnp.log("NODE","Worker "..i.." "..Threads[i]:status().." "..ThreadStatus[i])
     end
     mnp.log("NODE","-------------------------")
+  elseif id=="key_down" and port==38 then
+    if passlog then passlog=false else passlog=true end
+    mnp.log("PASS","Logging passing packets set to "..tostring(passlog))
   elseif id=="modem_message" then
     local found=false
     for i=1,config.threads do
