@@ -14,7 +14,7 @@ local thread=require("thread")
 local event=require("event")
 local ip=require("ipv2")
 local gpu=component.gpu
-local mnp_ver="2.5.5 BETA"
+local mnp_ver="2.5.6 BETA"
 local mncp_ver="2.5 ALPHA"
 local ports={}
 ports["mnp_reg"]=1000
@@ -52,8 +52,8 @@ function mnp.log(mod,text,crit)
 	end
 end
 --init-----------------------------------
-if not fs.exists('/etc/apm') then
-  fs.makeDirectory('/etc/apm')
+if not fs.exists('/etc/mnp') then
+  fs.makeDirectory('/etc/mnp')
 end
 function mnp.logVersions()
 	mnp.log("MNP","MNP version " .. mnp_ver)
@@ -418,11 +418,16 @@ function mnp.checkAvailability(dest)
       end
     end
     dest=mnp.getFromDomain(domain)[1]
-  elseif not mnp.getSavedRoute(dest) then
-    mnp.log("MNP","No route to "..dest.." found. searching...",1)
-    if not mnp.search(dest) then
-      mnp.log("MNP","Failed search",1)
-      return false
+  else
+    local check
+    check,dest=ip.isIPv2(dest)
+    if not check then return false end
+    if not mnp.getSavedRoute(dest) then
+      mnp.log("MNP","No route to "..dest.." found. searching...",1)
+      if not mnp.search(dest) then
+        mnp.log("MNP","Failed search",1)
+        return false
+      end
     end
   end
   if not mnp.getSavedRoute(dest) then mnp.log("MNP","Couldn't get route for "..dest,2) return false,nil end
