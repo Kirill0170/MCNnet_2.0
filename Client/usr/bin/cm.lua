@@ -1,5 +1,5 @@
 --MNP CONNECTION MANAGER for client
-local ver="ALPHA 0.9.8"
+local ver="ALPHA 0.9.8.2"
 local filename="/usr/.cm_last_netname"
 local mnp=require("cmnp")
 local ip=require("ipv2")
@@ -225,9 +225,9 @@ local function reset()
   if chk=="y" or chk=="Y" then
     print("Resetting!")
     disconnect()
-    os.remove("/etc/mnpSavedNetworks.st")
-    os.remove("/etc/mnpSavedRoutes.st")
-    os.remove("/etc/mnpSavedDomains.st")
+    os.remove("/etc/mnp/SavedNetworks.st")
+    os.remove("/etc/mnp/SavedRoutes.st")
+    os.remove("/etc/mnp/SavedDomains.st")
   end
 end
 --main
