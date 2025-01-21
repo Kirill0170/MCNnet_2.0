@@ -241,13 +241,15 @@ function mnp.loadRoutes()
   return savedata2
 end
 function mnp.getSavedRoute(to_ip)
-  if not ip.isIPv2(to_ip) then return nil end
+  local check,to_ip=ip.isIPv2(to_ip)
+  if not check then return nil end
   local saved=mnp.loadRoutes()
   if saved=={} then return nil end
   return saved[to_ip]
 end
 function mnp.saveRoute(to_ip,route)
-  if not netpacket.checkRoute(route) or not ip.isIPv2(to_ip) then return false end
+  local check,to_ip=ip.isIPv2(to_ip)
+  if not netpacket.checkRoute(route) or not check then return false end
   local saved=mnp.loadRoutes()
   saved[to_ip]=route
   local file=io.open(routeSaveFileName,"w")
