@@ -1,12 +1,8 @@
 W: Package manager: package servers send updates to listserv
 MNP update
 -passwords for networks
--move mnp files to /etc/mnp/
 -better domains
 -cm setdomain
--node debug
--node check if connected
-:34cd local ipv2
 MNP: network-wide admin operations:
   get_network
 --future--
