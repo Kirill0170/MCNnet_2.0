@@ -14,11 +14,8 @@ local thread=require("thread")
 local event=require("event")
 local ip=require("ipv2")
 local gpu=component.gpu
-local mnp_ver="2.5.4 BETA"
-local mncp_ver="2.4.2 INDEV"
-local forbidden_vers={}
-forbidden_vers["mnp"]={"2.21 EXPERIMENTAL"}
-forbidden_vers["mncp"]={"2.1 EXPERIMENTAL"}
+local mnp_ver="2.5.5 BETA"
+local mncp_ver="2.5 ALPHA"
 local ports={}
 ports["mnp_reg"]=1000
 ports["mnp_srch"]=1001
@@ -26,13 +23,9 @@ ports["mnp_data"]=1002
 ports["mncp_srvc"]=1003
 ports["mncp_err"]=1004
 ports["mncp_ping"]=1005
-ports["mftp_conn"]=1006
-ports["mftp_data"]=1007
-ports["mftp_srvc"]=1008
-ports["dns_lookup"]=1009
 local mnp={}
 mnp.mncp={}
-function mnp.log(mod,text, crit)
+function mnp.log(mod,text,crit)
 	if not mod then mod="MNP" end
 	if not text then text="Unknown" end
 	local res = "[" .. computer.uptime() .. "]"
@@ -62,7 +55,7 @@ end
 if not fs.exists('/etc/apm') then
   fs.makeDirectory('/etc/apm')
 end
-function mnp.logVersions() 
+function mnp.logVersions()
 	mnp.log("MNP","MNP version " .. mnp_ver)
 	mnp.log("MNP","MNCP version " .. mncp_ver)
 	mnp.log("MNP","NP version " .. netpacket.ver())
@@ -174,7 +167,7 @@ function mnp.loadSavedNodes()
   if not file then --initialize file
     file=io.open(networkSaveFileName,"w")
     if not file then
-      error("Can't open file to write: "..networkSaveFileName) 
+      error("Can't open file to write: "..networkSaveFileName)
     end
     file:write(ser.serialize({}))
     file:close()
@@ -330,7 +323,7 @@ function mnp.networkSearch(searchTime,save)
   if not modem.isOpen(ports["mnp_reg"]) then modem.open(ports["mnp_reg"]) end
   thread.create(timer,searchTime,timerName):detach()
   while true do
-    modem.broadcast(ports["mnp_reg"],"netsearch",ser.serialize(netpacket.newPacket()),ser.serialize({res}))
+    modem.broadcast(ports["mnp_reg"],"netsearch",ser.serialize(netpacket.newPacket()),ser.serialize(res))
     local id,name,from,port,dist,mtype,np,data=event.pullMultiple("modem","timeout","interrupted")
     if id=="interrupted" then break
     elseif id=="timeout" and name==timerName then break
