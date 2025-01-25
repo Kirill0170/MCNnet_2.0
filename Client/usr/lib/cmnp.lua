@@ -1,9 +1,9 @@
 --Mcn-net Networking Protocol for Client BETA
 --Modem is required.
 local dolog=false
-local networkSaveFileName="/etc/mnp/SavedNetworks.st"-- array[netname]=<uuid-address>
-local routeSaveFileName="/etc/mnp/SavedRoutes.st" --array[to_ip]=<route>
-local domainSaveFileName="/etc/mnp/SavedDomains.st" --array[domain]={<ip>,<route>}
+local networkSaveFileName="/etc/mnp/SavedNetworks.st"-- array[<ipv2]>]={<netname>,<uuid-address>,<password>}
+local routeSaveFileName="/etc/mnp/SavedRoutes.st" --array[<ipv2>]=<route>
+local domainSaveFileName="/etc/mnp/SavedDomains.st" --array[<domain>]={<ipv2>,<route>}
 local component=require("component")
 local computer=require("computer")
 local ser=require("serialization")
@@ -14,8 +14,8 @@ local thread=require("thread")
 local event=require("event")
 local ip=require("ipv2")
 local gpu=component.gpu
-local mnp_ver="2.5.6 BETA"
-local mncp_ver="2.5 ALPHA"
+local mnp_ver="2.6.0"
+local mncp_ver="2.5"
 local ports={}
 ports["mnp_reg"]=1000
 ports["mnp_srch"]=1001
@@ -160,6 +160,11 @@ function mnp.toggleLog(change)
     return true
   else return false end
 end
+function mnp.checkHostname(name)
+  if not name then return false end
+  local pattern = "^%w+%.%w+$"
+  return string.match(name, pattern) ~= nil
+end
 ----------Saving Node Addresses------------
 function mnp.setNetworkSaveFileName(newName) networkSaveFileName=newName end
 function mnp.loadSavedNodes()
@@ -178,9 +183,9 @@ function mnp.loadSavedNodes()
   local savedata2={}
   --checks
   if type(savedata)~="table" then return {} end
-  for netname,n_uuid in pairs(savedata) do
-    if ip.isUUID(n_uuid) then
-      savedata2[netname]=n_uuid
+  for n_ip,n_data in pairs(savedata) do
+    if ip.isUUID(n_data[2]) then
+      savedata2[n_ip]=n_data
     end
   end
   return savedata2
@@ -189,7 +194,7 @@ function mnp.saveNodes(table)
   if type(table)~="table" then return false end
   local file=io.open(networkSaveFileName, "w")
   if not file then
-    error("Can't open file to write: "..networkSaveFileName) 
+    error("Can't open file to write: "..networkSaveFileName)
   end
   file:write(ser.serialize(table))
   file:close()
@@ -197,15 +202,21 @@ function mnp.saveNodes(table)
 end
 function mnp.getSavedNode(networkName)
   local table=mnp.loadSavedNodes()
-  for netname,from in pairs(table) do
-    if netname==networkName then return from end 
+  for n_ip,n_info in pairs(table) do
+    if n_info[1]==networkName then return n_info[2],n_info[3],n_ip end
   end
   return nil
 end
-function mnp.checkHostname(name) --imported from dns.lua
-  if not name then return false end
-  local pattern = "^%w+%.%w+$"
-  return string.match(name, pattern) ~= nil
+function mnp.addNodePassword(name,password)
+  local table=mnp.loadSavedNodes()
+  for n_ip,n_data in pairs(table) do
+    if n_data[1]==name then
+      table[n_ip][3]=password
+      mnp.saveNodes(table)
+      return true
+    end
+  end
+  return false
 end
 -----------Saving searched routes------------
 function mnp.setRouteSaveFileName(newName) routeSaveFileName=newName end
@@ -227,7 +238,7 @@ function mnp.loadRoutes()
   if type(savedata)~="table" then
     file=io.open(routeSaveFileName,"w")
     if not file then
-      error("Can't open file to write: "..routeSaveFileName) 
+      error("Can't open file to write: "..routeSaveFileName)
     end
     file:write(ser.serialize({}))
     file:close()
@@ -331,39 +342,42 @@ function mnp.networkSearch(searchTime,save)
     elseif id=="timeout" and name==timerName then break
     else
       if port==ports["mnp_reg"] then
-        if not netpacket.checkPacket(ser.unserialize(np)) then mnp.log("MNP","Invalid packet on netsearch")
+        np=ser.unserialize(np)
+        if not netpacket.checkPacket(np) then mnp.log("MNP","Invalid packet on netsearch")
         else
           data=ser.unserialize(data)
           if data[1]~=nil then --netname found
-            res[data[1]]={from,dist}
-            if save then saveTable[data[1]]=from end
+            res[np["route"][0]]={data[1],from,dist,data[2]}
+            if save then saveTable[np["route"][0]]={data[1],from} end
           end
         end
       end
     end
   end
   if save then mnp.saveNodes(saveTable) end
-  return res --table[netname]={<uuid>,dist}
+  return res --table[node ip]={name,uuid,dist,requirePassword}
 end
 
-function mnp.networkConnectByName(from,name)
+function mnp.networkConnectByName(to_uuid,name,password,force_static)
   if not name then return false end
+  if not password then password="" end
+  if not force_static then force_static=true end
   os.setenv("this_ip","0000:0000")
   os.setenv("node_uuid",nil)
   local rnp=netpacket.newPacket(os.getenv("this_ip"))--!!
-  local sdata={name}
-  modem.send(from,ports["mnp_reg"],"netconnect",ser.serialize(rnp),ser.serialize(sdata))
+  local sdata={name,password,force_static}
+  modem.send(to_uuid,ports["mnp_reg"],"netconnect",ser.serialize(rnp),ser.serialize(sdata))
   while true do
     local _,this,rfrom,port,_,mtype,np,data=event.pull(5,"modem")
     if not rfrom then
       mnp.log("MNP","Node timeouted")
       return false
-    elseif port~=ports["mnp_reg"] or rfrom~=from then
+    elseif port~=ports["mnp_reg"] or rfrom~=to_uuid then
     else
       data=ser.unserialize(data)
-      if name==data[1] then
+      if name==data[1] and mtype=="netconnect" then
         mnp.log("MNP","Connected to "..name)
-        if not ip.isIPv2(data[2]) then 
+        if not ip.isIPv2(data[2]) then
           mnp.log("MNP","incorrect IP received: aborted")
           return false
         end
@@ -372,9 +386,12 @@ function mnp.networkConnectByName(from,name)
           return false
         else
           mnp.log("MNP","IP is set")
-          os.setenv("node_uuid",from)
+          os.setenv("node_uuid",to_uuid)
           return true
         end
+      elseif mtype=="netforbidden" then
+        mnp.log("MNP","Password incorrect!",1)
+        return false,true
       else
         mnp.log("MNP","Unexpected network name received")
         return false

@@ -11,7 +11,7 @@ local modem = component.modem
 local event = require("event")
 local ip = require("ipv2")
 local gpu = component.gpu
-local mnp_ver = "2.6-dev2"
+local mnp_ver = "2.6.0"
 local mncp_ver = "2.4"
 local ports = {}
 ports["mnp_reg"] = 1000
@@ -126,9 +126,10 @@ function mnp.networkSearch(from, np, data,requirePassword) --allows finding
 	if requirePassword==nil then requirePassword=false end
 	--check
 	local respond = true
-	for name in pairs(data) do
-		if mnp.networkName == name then
+	for _,name in pairs(data) do
+		if mnp.networkName == name[1] then
 			respond = false
+			print(name[1],respond)
 		end
 	end
 	if respond then

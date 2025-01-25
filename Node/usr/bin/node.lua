@@ -68,11 +68,11 @@ mnp.log("NODE","Node "..node_ver.." Starting - Hello World!")
 mnp.log("NODE","Reading config")
 if not require("filesystem").exists(configFile) then
   mnp.log("NODE","Couldn't open config file",1)
-  mnp.log("NODE","Continuing with default args: Internet \"\" \"\" 10 true true true 4",1)
+  mnp.log("NODE","Continuing with default args: Internet \"\" \"\" 2 true true true 4",1)
   config.netName="Internet"
   config.clientPassword=""
   config.nodePassword=""
-  config.searchTime=10
+  config.searchTime=2
   config.log=true
   config.logTTL=true
   config.clearNIPS=true
