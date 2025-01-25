@@ -1,5 +1,5 @@
 --MNP CONNECTION MANAGER for client
-local ver="ALPHA 0.9.8.2"
+local ver="ALPHA 0.9.9"
 local filename="/usr/.cm_last_netname"
 local mnp=require("cmnp")
 local ip=require("ipv2")
@@ -90,12 +90,12 @@ end
 
 local function netsearch(s,p)
   print("Searching for networks...")
-  local rsi=mnp.networkSearch(5,true) --res[netname]={from,dist}
+  local rsi=mnp.networkSearch(5,true) --res[netname]={from,dist,requirePassword}
   if not next(rsi) then cprint("No networks found",0xFFCC33)
   else
     print("№ | Network name | distance")
     local counter=1
-    local choice={} --choice[num]={{from,dist},netname}
+    local choice={} --choice[num]={{from,dist,requirePassword},netname}
     for name, info in pairs(rsi) do
       printDist(tostring(counter).." | "..name,info[2])
       choice[counter]={rsi[name],name}
@@ -123,7 +123,18 @@ local function netsearch(s,p)
     --connect
     print("Trying to connect to "..choice[selected][2])
     savePrevName(choice[selected][2])
-    mnp.networkConnectByName(choice[selected][1][1],choice[selected][2],1)
+    if choice[selected][1][3] then
+      print("Enter network password")
+      local new_password=io.read()
+      if mnp.networkConnectByName(choice[selected][1][1],choice[selected][2],new_password) then
+        cprint("Connected successfully",0xcc33cc)
+        mnp.addNodePassword(choice[selected][2],new_password)
+      else
+        cprint("Incorrect password!",0xFF0000)
+      end
+    else
+      mnp.networkConnectByName(choice[selected][1][1],choice[selected][2],"")
+    end
   end
 end
 
@@ -136,14 +147,24 @@ local function connect(name)
       return false
     end
   end
-  local address=mnp.getSavedNode(name)
+  local address,password=mnp.getSavedNode(name)
   if not address then
     cprint("Saved node addresses not found. Use 'cm netsearch' to search for networks",0xFFCC33)
     return false end
   if mnp.isConnected() then mnp.disconnect() end
   print("Trying to connect to "..name)
   savePrevName(name)
-  if mnp.networkConnectByName(address,name) then print("Connected successfully")
+  local check,password_required=mnp.networkConnectByName(address,name,password)
+  if check then cprint("Connected successfully",0xcc33cc)
+  elseif password_required then
+    print("Enter network password")
+    local new_password=io.read()
+    if mnp.networkConnectByName(address,name,new_password) then
+      cprint("Connected successfully",0x33cc33)
+      mnp.addNodePassword(name,new_password)
+    else
+      cprint("Incorrect password!",0xFF0000)
+    end
   else print("Couldn't connect") end
 end
 
