@@ -1,5 +1,5 @@
 --MNP CONNECTION MANAGER for client
-local ver="ALPHA 0.9.9"
+local ver="ALPHA 0.9.10"
 local filename="/usr/.cm_last_netname"
 local mnp=require("cmnp")
 local ip=require("ipv2")
@@ -90,18 +90,20 @@ end
 
 local function netsearch(s,p)
   print("Searching for networks...")
-  local rsi=mnp.networkSearch(5,true) --res[netname]={from,dist,requirePassword}
+  local rsi=mnp.networkSearch(5,true) --res[node ip]={name,from,dist,requirePassword}
   if not next(rsi) then cprint("No networks found",0xFFCC33)
   else
-    print("№ | Network name | distance")
+    print("№ |   IPv2    | Network name | distance")
+    print("--+-----------+--------------+---------")
     local counter=1
-    local choice={} --choice[num]={{from,dist,requirePassword},netname}
-    for name, info in pairs(rsi) do
-      printDist(tostring(counter).." | "..name,info[2])
-      choice[counter]={rsi[name],name}
+    local choice={} --choice[num]={{name,from,dist,requirePassword},netname}
+    for node_ip, info in pairs(rsi) do
+      local name=info[1]
+      printDist(tostring(counter).." | "..node_ip.." | "..name,info[3])
+      choice[counter]={rsi[node_ip],name}
       counter=counter+1
     end
-    print("------------------------------")
+    print("--+-----------+--------------+---------")
     print("Select network to connect or 'q' to exit")
     local exit=false
     local selected=0
@@ -114,26 +116,28 @@ local function netsearch(s,p)
           selected=tonumber(input)
           exit=true
         else
-          cprint("Invalid choice.",0xFF0000)
+          cprint("Unknown choice.",0xFF0000)
         end
       else
-        cprint("Unknown choice. 'q' to exit.",0xFF0000)
+        cprint("Invalid choice. 'q' to exit.",0xFF0000)
       end
     end
     --connect
     print("Trying to connect to "..choice[selected][2])
     savePrevName(choice[selected][2])
-    if choice[selected][1][3] then
-      print("Enter network password")
-      local new_password=io.read()
-      if mnp.networkConnectByName(choice[selected][1][1],choice[selected][2],new_password) then
-        cprint("Connected successfully",0xcc33cc)
+    if choice[selected][1][4] then
+      term.write("Enter network password: ")
+      local new_password=term.read({},false,{},"*")
+      term.write("\n")
+      new_password=string.sub(new_password,1,#new_password-1)
+      if mnp.networkConnectByName(choice[selected][1][2],choice[selected][2],new_password) then
+        cprint("Connected successfully",0x33cc33)
         mnp.addNodePassword(choice[selected][2],new_password)
       else
         cprint("Incorrect password!",0xFF0000)
       end
     else
-      mnp.networkConnectByName(choice[selected][1][1],choice[selected][2],"")
+      mnp.networkConnectByName(choice[selected][1][2],choice[selected][2],"")
     end
   end
 end
@@ -155,10 +159,12 @@ local function connect(name)
   print("Trying to connect to "..name)
   savePrevName(name)
   local check,password_required=mnp.networkConnectByName(address,name,password)
-  if check then cprint("Connected successfully",0xcc33cc)
+  if check then cprint("Connected successfully",0x33cc33)
   elseif password_required then
-    print("Enter network password")
-    local new_password=io.read()
+    term.write("Enter network password: ")
+    local new_password=term.read({},false,{},"*")
+    new_password=string.sub(new_password,1,#new_password-1)
+    term.write("\n")
     if mnp.networkConnectByName(address,name,new_password) then
       cprint("Connected successfully",0x33cc33)
       mnp.addNodePassword(name,new_password)
