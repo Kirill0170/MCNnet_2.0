@@ -5,7 +5,7 @@
 local component=require("component")
 if not component.isAvailable("modem") then error("[IP INIT]: No modem present") end
 local this_uuid=component.getPrimary("modem")["address"]
-local ip_ver="2.4 BETA"
+local ip_ver="2.5 BETA"
 local nips={} --nips[<ip>]=<uuid>
 local ip={}
 ----------------------------
@@ -89,20 +89,26 @@ function ip.findIP(g_uuid)
   return nil
 end
 
-function ip.addUUID(g_uuid,node)
-  if not ip.isUUID(g_uuid) then return false end
+function ip.addStaticUUID(g_uuid,node)
+  if not ip.isUUID(g_uuid) then return nil end
   local f_ip=ip.findIP(g_uuid) --check if this ip already exists
   if f_ip~=nil then --overwrite
     nips[f_ip]=g_uuid
-    return true
+    return f_ip
   end
   local n_ip
   if not node then n_ip=ip.fromUUID(g_uuid) --reg
   else n_ip=string.sub(g_uuid,1,4)..":0000" end --node
   nips[n_ip]=g_uuid
-  return true
+  return n_ip
 end
-
+function ip.addDynamicUUID(g_uuid)
+  if not ip.isUUID(g_uuid) then return nil end
+  local random_part=string.sub(require("uuid").next(),1,4)
+  local n_ip=string.sub(this_uuid,1,4)..":"..random_part
+  nips[n_ip]=g_uuid
+  return n_ip
+end
 function ip.deleteIP(g_ip)
   nips[g_ip]=nil return true
 end
