@@ -1,6 +1,5 @@
 W: Package manager: package servers send updates to listserv
 MNP update
--passwords for networks
 -better domains(make dns global, lol(check network if busy))
 -cm setdomain
 MNP: network-wide admin operations:

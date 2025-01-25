@@ -2,7 +2,7 @@
 --Modem is required.
 local dolog=false
 local networkSaveFileName="/etc/mnp/SavedNetworks.st"-- array[<ipv2]>]={<netname>,<uuid-address>,<password>}
-local routeSaveFileName="/etc/mnp/SavedRoutes.st" --array[<ipv2>]=<route>
+local routeSaveFileName="/etc/mnp/SavedRoutes.st" --array[<this_ip>][<ipv2>]=<route>
 local domainSaveFileName="/etc/mnp/SavedDomains.st" --array[<domain>]={<ipv2>,<route>}
 local component=require("component")
 local computer=require("computer")
@@ -14,7 +14,7 @@ local thread=require("thread")
 local event=require("event")
 local ip=require("ipv2")
 local gpu=component.gpu
-local mnp_ver="2.6.0"
+local mnp_ver="2.6.1"
 local mncp_ver="2.5"
 local ports={}
 ports["mnp_reg"]=1000
@@ -251,25 +251,35 @@ function mnp.loadRoutes()
   end
   return savedata2
 end
+function mnp.saveRoutes(table)
+  if type(table)~="table" then return false end
+  local file=io.open(routeSaveFileName,"w")
+  if not file then
+    error("Can't open file to write: "..routeSaveFileName)
+  end
+  file:write(ser.serialize(table))
+  file:close()
+  return true
+end
 function mnp.getSavedRoute(to_ip)
   local check,to_ip=ip.isIPv2(to_ip)
   if not check then return nil end
   local saved=mnp.loadRoutes()
   if saved=={} then return nil end
-  return saved[to_ip]
+  local this_ip="unknown"
+  if mnp.isConnected() then this_ip=os.getenv("this_ip") end
+  local route=saved[this_ip][to_ip]
+  return route
 end
 function mnp.saveRoute(to_ip,route)
   local check,to_ip=ip.isIPv2(to_ip)
   if not netpacket.checkRoute(route) or not check then return false end
   local saved=mnp.loadRoutes()
-  saved[to_ip]=route
-  local file=io.open(routeSaveFileName,"w")
-  if not file then
-    error("Can't open file to write: "..routeSaveFileName)
-  end
-  file:write(ser.serialize(saved))
-  file:close()
-  return true
+  local this_ip="unknown"
+  if mnp.isConnected() then this_ip=os.getenv("this_ip") end
+  if not saved[this_ip] then saved[this_ip]={} end
+  saved[this_ip][to_ip]=route
+  mnp.saveRoutes(saved)
 end
 -----------Saving searched domians-----------
 function mnp.loadDomains()
