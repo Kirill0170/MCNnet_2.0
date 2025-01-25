@@ -14,7 +14,7 @@ local thread=require("thread")
 local event=require("event")
 local ip=require("ipv2")
 local gpu=component.gpu
-local mnp_ver="2.6.1"
+local mnp_ver="2.6.2"
 local mncp_ver="2.5"
 local ports={}
 ports["mnp_reg"]=1000
@@ -190,8 +190,32 @@ function mnp.loadSavedNodes()
   end
   return savedata2
 end
-function mnp.saveNodes(table)
+function mnp.getSavedNode(networkName)--make for uuid?
+  local table=mnp.loadSavedNodes()
+  for n_ip,n_info in pairs(table) do
+    if n_info[1]==networkName then return n_info[2],n_info[3],n_ip end
+  end
+  return nil
+end
+function mnp.getSavedNodeName(g_uuid)
+  local table=mnp.loadSavedNodes()
+  for n_ip,n_info in pairs(table) do
+    if n_info[2]==g_uuid then return n_info[1],n_info[3],n_ip end
+  end
+  return nil
+end
+function mnp.saveNodes(table,force)
   if type(table)~="table" then return false end
+  if not force then
+    local old_nodes=mnp.loadSavedNodes()
+    for n_ip,n_data in pairs(table) do
+      if old_nodes[n_ip]~=nil then
+        local password=n_data[3]
+        if not password then password=old_nodes[n_ip][3] end
+        table[n_ip][3]=password
+      end
+    end
+  end
   local file=io.open(networkSaveFileName, "w")
   if not file then
     error("Can't open file to write: "..networkSaveFileName)
@@ -200,17 +224,10 @@ function mnp.saveNodes(table)
   file:close()
   return true
 end
-function mnp.getSavedNode(networkName)
-  local table=mnp.loadSavedNodes()
-  for n_ip,n_info in pairs(table) do
-    if n_info[1]==networkName then return n_info[2],n_info[3],n_ip end
-  end
-  return nil
-end
-function mnp.addNodePassword(name,password)
+function mnp.addNodePassword(node_ip,password)
   local table=mnp.loadSavedNodes()
   for n_ip,n_data in pairs(table) do
-    if n_data[1]==name then
+    if n_ip==node_ip then
       table[n_ip][3]=password
       mnp.saveNodes(table)
       return true
@@ -244,12 +261,12 @@ function mnp.loadRoutes()
     file:close()
     return {}
   end
-  for s_ip,route in pairs(savedata) do
-    if ip.isIPv2(s_ip) and netpacket.checkRoute(route) then
-      savedata2[s_ip]=route
-    end
-  end
-  return savedata2
+  -- for s_ip,route in pairs(savedata) do
+  --   if ip.isIPv2(s_ip) and netpacket.checkRoute(route) then
+  --     savedata2[s_ip]=route
+  --   end
+  -- end
+  return savedata --dunno how to fix this.
 end
 function mnp.saveRoutes(table)
   if type(table)~="table" then return false end
@@ -268,6 +285,7 @@ function mnp.getSavedRoute(to_ip)
   if saved=={} then return nil end
   local this_ip="unknown"
   if mnp.isConnected() then this_ip=os.getenv("this_ip") end
+  if not saved[this_ip] then saved[this_ip]={} end
   local route=saved[this_ip][to_ip]
   return route
 end
@@ -307,16 +325,16 @@ function mnp.loadDomains()
     return {}
   end
   for domain,data in pairs(savedata) do
-    if mnp.checkHostname(domain) and ip.isIPv2(data[1]) and netpacket.checkRoute(data[2]) then
+    if mnp.checkHostname(domain) and ip.isIPv2(data[1]) then
       savedata2[domain]=data
     end
   end
   return savedata2
 end
-function mnp.saveDomain(domain,to_ip,route)
-  if not mnp.checkHostname(domain) or not netpacket.checkRoute(route) or not ip.isIPv2(to_ip) then return false end
+function mnp.saveDomain(domain,to_ip)
+  if not mnp.checkHostname(domain) or not ip.isIPv2(to_ip) then return false end
   local saved=mnp.loadDomains()
-  saved[domain]={to_ip,route}
+  saved[domain]={to_ip}
   local file=io.open(domainSaveFileName,"w")
   if not file then
     error("Can't open file to write: "..domainSaveFileName)
@@ -469,7 +487,7 @@ function mnp.search(to_ip,searchTime,domain)
   local dns=false
   if mnp.checkHostname(domain) then
     dns=true
-    netpacket.newPacket("broadcast")
+    np=netpacket.newPacket("broadcast")
   end
   mnp.openPorts()
   mnp.log("MNP","Started search for "..to_ip)
@@ -497,7 +515,7 @@ function mnp.search(to_ip,searchTime,domain)
             if ip.isIPv2(data[2]) then
               mnp.saveRoute(data[2],rnp["route"])
             end
-            mnp.saveDomain(domain,data[2],rnp["route"])
+            mnp.saveDomain(domain,data[2])
             return true
           end
         else --error

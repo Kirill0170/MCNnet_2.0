@@ -1,6 +1,6 @@
 --MNP CONNECTION MANAGER for client
-local ver="ALPHA 0.9.10"
-local filename="/usr/.cm_last_netname"
+local ver="ALPHA 0.9.12"
+local filename="/etc/.cm_last_netuuid"
 local mnp=require("cmnp")
 local ip=require("ipv2")
 local term=require("term")
@@ -48,12 +48,12 @@ local function versions()
   mnp.logVersions()
 end
 
-local function savePrevName(name)
+local function savePrevAddress(name)
   local file=io.open(filename,"w")
   file:write(name)
   file:close()
 end
-local function loadPrevName()
+local function loadPrevAddress()
   local file=io.open(filename,"r")
   if not file then return nil end
   local name=file:read("*a")
@@ -69,7 +69,7 @@ local function status()
   print("This computer's IP is: "..this_ip)
   if mnp.isConnected(true) then
     cprint("Connected!",0x33CC33)
-    cprint("Network name: "..loadPrevName(),0x33CC33)
+    cprint("Network name: "..mnp.getSavedNodeName(loadPrevAddress()),0x33CC33)
   else
     cprint("Not connected.",0xFF0000)
   end
@@ -96,11 +96,11 @@ local function netsearch(s,p)
     print("№ |   IPv2    | Network name | distance")
     print("--+-----------+--------------+---------")
     local counter=1
-    local choice={} --choice[num]={{name,from,dist,requirePassword},netname}
+    local choice={} --choice[num]={{name,from,dist,requirePassword},netname,node_ip}
     for node_ip, info in pairs(rsi) do
       local name=info[1]
       printDist(tostring(counter).." | "..node_ip.." | "..name,info[3])
-      choice[counter]={rsi[node_ip],name}
+      choice[counter]={rsi[node_ip],name,node_ip}
       counter=counter+1
     end
     print("--+-----------+--------------+---------")
@@ -124,7 +124,7 @@ local function netsearch(s,p)
     end
     --connect
     print("Trying to connect to "..choice[selected][2])
-    savePrevName(choice[selected][2])
+    savePrevAddress(choice[selected][1][2])
     if choice[selected][1][4] then
       term.write("Enter network password: ")
       local new_password=term.read({},false,{},"*")
@@ -132,7 +132,7 @@ local function netsearch(s,p)
       new_password=string.sub(new_password,1,#new_password-1)
       if mnp.networkConnectByName(choice[selected][1][2],choice[selected][2],new_password) then
         cprint("Connected successfully",0x33cc33)
-        mnp.addNodePassword(choice[selected][2],new_password)
+        mnp.addNodePassword(choice[selected][3],new_password)
       else
         cprint("Incorrect password!",0xFF0000)
       end
@@ -144,20 +144,19 @@ end
 
 local function connect(name)
   mnp.openPorts()
+  local address,password,node_ip
   if not name then--check previous name
-    name=loadPrevName()
-    if not name then
-      cprint("You haven't connected before. Use 'cm netsearch' to search for networks",0xFFCC33)
-      return false
-    end
+    address=loadPrevAddress()
+    name,password,node_ip=mnp.getSavedNodeName(address)
+  else
+    address,password,node_ip=mnp.getSavedNode(name)
   end
-  local address,password=mnp.getSavedNode(name)
   if not address then
     cprint("Saved node addresses not found. Use 'cm netsearch' to search for networks",0xFFCC33)
     return false end
   if mnp.isConnected() then mnp.disconnect() end
-  print("Trying to connect to "..name)
-  savePrevName(name)
+  print("Trying to connect to "..name.." ("..node_ip..")")
+  savePrevAddress(address)
   local check,password_required=mnp.networkConnectByName(address,name,password)
   if check then cprint("Connected successfully",0x33cc33)
   elseif password_required then
@@ -165,9 +164,9 @@ local function connect(name)
     local new_password=term.read({},false,{},"*")
     new_password=string.sub(new_password,1,#new_password-1)
     term.write("\n")
-    if mnp.networkConnectByName(address,name,new_password) then
+    if mnp.networkConnectByName(address,node_ip,new_password) then
       cprint("Connected successfully",0x33cc33)
-      mnp.addNodePassword(name,new_password)
+      mnp.addNodePassword(node_ip,new_password)
     else
       cprint("Incorrect password!",0xFF0000)
     end
@@ -227,6 +226,7 @@ local function c2cping(n,t,dest)
   local check,to_ip=mnp.checkAvailability(dest)
   if not check then
     cprint("Couldn't find host!",0xFF0000)
+    return false
   end
   print("Client-to-Client pinging "..to_ip)
   if n==1 then
