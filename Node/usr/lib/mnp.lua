@@ -2,7 +2,6 @@
 --Modem is required.
 local dolog = true --log?
 local ttllog = true --log ttl discardment?
-local mncplog = true --log MNCP checks?
 local component = require("component")
 local computer = require("computer")
 local ser = require("serialization")
@@ -12,11 +11,8 @@ local modem = component.modem
 local event = require("event")
 local ip = require("ipv2")
 local gpu = component.gpu
-local mnp_ver = "2.5 BETA"
-local mncp_ver = "2.3.2 REWORK INDEV"
-local forbidden_vers = {}
-forbidden_vers["mnp"] = { "2.21 EXPERIMENTAL" }
-forbidden_vers["mncp"] = { "2.1 EXPERIMENTAL" }
+local mnp_ver = "2.6-dev2"
+local mncp_ver = "2.4"
 local ports = {}
 ports["mnp_reg"] = 1000
 ports["mnp_srch"] = 1001
@@ -24,10 +20,6 @@ ports["mnp_data"] = 1002
 ports["mncp_srvc"] = 1003
 ports["mncp_err"] = 1004
 ports["mncp_ping"] = 1005
-ports["mftp_conn"] = 1006
-ports["mftp_data"] = 1007
-ports["mftp_srvc"] = 1008
-ports["dns_lookup"] = 1009
 local mnp = {}
 mnp.mncp={}
 mnp.networkName = "default" --default network name
@@ -70,9 +62,6 @@ function mnp.mncp.checkService() --rewrite with timer
 end
 function mnp.mncp.nodePing(from)
 	modem.send(from, ports["mncp_ping"], "mncp_ping", ser.serialize(netpacket.newPacket()))
-end
-function mnp.mncp.c2cPing(to_ip)
-	--write
 end
 --MNP------------------------------------
 --Util-
@@ -130,10 +119,11 @@ function mnp.networkDisconnect(from)
 	local deleted_ip=ip.deleteUUID(from)
 	mnp.log("MNP","Disconnected: "..tostring(deleted_ip))
 end
-function mnp.networkSearch(from, np, data) --allows finding
+function mnp.networkSearch(from, np, data,requirePassword) --allows finding
 	if not ip.isUUID(from) or not netpacket.checkPacket(np) then
 		mnp.log("MNP","Invalid packet or no from address",2)
 	end
+	if requirePassword==nil then requirePassword=false end
 	--check
 	local respond = true
 	for name in pairs(data) do
@@ -143,10 +133,10 @@ function mnp.networkSearch(from, np, data) --allows finding
 	end
 	if respond then
 		local rnp = netpacket.newPacket()
-		modem.send(from, ports["mnp_reg"], "netsearch", ser.serialize(rnp), ser.serialize({ mnp.networkName }))
+		modem.send(from, ports["mnp_reg"], "netsearch", ser.serialize(rnp), ser.serialize({ mnp.networkName,requirePassword }))
 	end
 end
-function mnp.networkConnect(from, np, data)
+function mnp.networkConnect(from,np,data,passwords)
 	if not ip.isUUID(from) or not netpacket.checkPacket(np) then
 		mnp.log("MNP","Invalid np or no from address",2)
 		return false
@@ -156,11 +146,25 @@ function mnp.networkConnect(from, np, data)
 			return false
 		end
 	end
+	if passwords then
+		if not passwords[1] or not passwords[2] then passwords=nil end
+	end
 	if np["route"][0] == "0000:0000" then --client
 		local rnp = ser.serialize(netpacket.newPacket())
-		local ipstr = string.sub(os.getenv("this_ip"), 1, 4) .. ":" .. string.sub(from, 1, 4)
-		modem.send(from, ports["mnp_reg"], "netconnect", rnp, ser.serialize({ mnp.networkName, ipstr }))
-		ip.addUUID(from)
+		if passwords then
+			if data[2]~=passwords[1] then
+				modem.send(from,ports["mnp_reg"],"netforbidden",rnp,ser.serialize({"You need a password!"}))
+				return false
+			end
+		end
+		local ipstr
+		if data[3]==true then
+			ipstr=ip.addStaticUUID(from)
+		else
+			ipstr=ip.addDynamicUUID(from)
+		end
+		if not ipstr then mnp.log("MNP","Couldn't make an IPv2 :(",2) return false end
+		modem.send(from, ports["mnp_reg"], "netconnect", rnp, ser.serialize({mnp.networkName,ipstr}))
 		mnp.log("MNP","New client connected: "..ipstr)
 		return true
 	elseif ip.isIPv2(np["route"][0], true) then --node
@@ -168,14 +172,21 @@ function mnp.networkConnect(from, np, data)
 			return true
 		end --check if already connected
 		--check found table
-		for f_ip in pairs(data[2]) do
+		for _,f_ip in pairs(data[2]) do
 			if f_ip == ip.gnip() then
 				return true
 			end
 		end
 		local rnp = ser.serialize(netpacket.newPacket())
+		--check password 
+		if passwords then
+			if data[3]~=passwords[2] then
+				modem.send(from,ports["mnp_reg"],"netforbidden",rnp,ser.serialize(){"You need a password!"})
+				return false
+			end
+		end
 		modem.send(from, ports["mnp_reg"], "netconnect", rnp, ser.serialize({ "ok" }))
-		ip.addUUID(from, true)
+		ip.addStaticUUID(from, true)
 		mnp.log("MNP","New node connected: "..np["route"][0])
 		return true
 	else
@@ -184,10 +195,11 @@ function mnp.networkConnect(from, np, data)
 	end
 end
 
-function mnp.nodeConnect(connectTime) --on node start, call this
+function mnp.nodeConnect(connectTime,password) --on node start, call this
 	if not tonumber(connectTime) then
 		connectTime = 10
 	end
+	if not password then password="" end
 	if not ip.isIPv2(os.getenv("this_ip"), true) then
 		mnp.log("MNP","Setup the ip first! Setting up for you..",1)
 		if not ip.set(ip.gnip(),true) then
@@ -200,18 +212,20 @@ function mnp.nodeConnect(connectTime) --on node start, call this
 	local exit = false
 	local found = {} --for found ips
 	while not exit do
-		modem.broadcast(ports["mnp_reg"], "netconnect", ser.serialize(rnp), ser.serialize({ mnp.networkName, found }))
+		modem.broadcast(ports["mnp_reg"], "netconnect", ser.serialize(rnp), ser.serialize({mnp.networkName,found,password}))
 		local id, name, from, port, dist, mtype, np = event.pullMultiple("interrupted", "timeout", "modem")
 		if id == "timeout" or id == "interrupted" then
 			exit = true
 			mnp.log("MNP","timeout")
-		else
+		elseif mtype=="netconnect" then
 			np = ser.unserialize(np)
 			if ip.isIPv2(np["route"][0], true) then
 				table.insert(found, np["route"][0])
-				ip.addUUID(from, true)
+				ip.addStaticUUID(from, true)
 				mnp.log("MNP","registered new node")
 			end
+		elseif mtype=="netforbidden" then
+			mnp.log("MNP","Incorrect password!",1)
 		end
 	end
 	return true
