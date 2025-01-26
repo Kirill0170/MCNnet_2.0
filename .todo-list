@@ -1,7 +1,6 @@
 W: Package manager: package servers send updates to listserv
 MNP update
--better domains(make dns global, lol(check network if busy))
--cm setdomain
+FTP list
 MNP: network-wide admin operations:
   get_network
 --future--
