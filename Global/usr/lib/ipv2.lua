@@ -5,7 +5,7 @@
 local component=require("component")
 if not component.isAvailable("modem") then error("[IP INIT]: No modem present") end
 local this_uuid=component.getPrimary("modem")["address"]
-local ip_ver="2.5.1"
+local ip_ver="2.5.2"
 local nips={} --nips[<ip>]=<uuid>
 local ip={}
 ----------------------------
@@ -105,7 +105,18 @@ function ip.addStaticUUID(g_uuid,node)
 end
 function ip.addDynamicUUID(g_uuid)
   if not ip.isUUID(g_uuid) then return nil end
-  local random_part=string.sub(require("uuid").next(),1,4)
+  local similar=true
+  local random_part=""
+  --check collisions
+  while similar do
+    random_part=string.sub(require("uuid").next(),1,4)
+    similar=false
+    for n_ip,_ in pairs(nips) do
+      if ip.getParts(n_ip) == random_part then
+        similar=true
+      end
+    end
+  end
   local n_ip=string.sub(this_uuid,1,4)..":"..random_part
   nips[n_ip]=g_uuid
   return n_ip
