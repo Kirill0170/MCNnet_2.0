@@ -1,5 +1,5 @@
 --Node (beta)
-local node_ver="[beta3 devbuild3]"
+local node_ver="[beta3 devbuild4]"
 local configFile="/etc/node.cfg"
 local component=require("component")
 local computer=require("computer")
@@ -40,11 +40,28 @@ local function packetThread(thread_id)
     elseif mtype=="netsearch" then
       mnp.networkSearch(from,np,data,config.clientPassword~="")
     elseif mtype=="search" then
-      mnp.search(from,np,data)
+      mnp.search(from,np)
     elseif mtype=="mncp_ping" then
       mnp.mncp.nodePing(from)
+    elseif mtype=="netdata" then
+      if passlog then
+        mnp.log("NETPASS"..str,np["route"][0].."->"..np["t"].." "..ser.serialize(data))
+      end
+      local nmtype=data[1]
+      local nmdata=data[3]
+      if nmtype=="netdomain" then
+        print("netdomain!",ser.serialize(nmdata))
+        mnp.addDomain(nmdata)
+      elseif nmtype=="deldomain" then
+        mnp.removeDomain(nmdata)
+      elseif nmtype=="" then
+
+      end
+      mnp.networkPass(data)
     elseif mtype=="setdomain" then
       mnp.setDomain(np,data)
+    elseif mtype=="getdomain" then
+      mnp.returnDomain(from,data)
     else --data
       if passlog then
         mnp.log("PASS"..str,np["route"][0].."->"..np["t"].." "..ser.serialize(data))
@@ -125,6 +142,7 @@ while true do
   elseif id=="key_down" and port==57 then
     mnp.log("NODE","--General-Info-----------")
     mnp.log("NODE","IP: "..os.getenv("this_ip"))
+    mnp.log("NODE","NetName: "..mnp.networkName)
     local percentage=tonumber((computer.totalMemory()-computer.freeMemory())/computer.totalMemory())*100
     mnp.log("NODE","Memory usage: "..string.format("%.0f%%",percentage))
     mnp.log("NODE","Free memory:"..computer.freeMemory().."/"..computer.totalMemory())
@@ -146,6 +164,10 @@ while true do
     end
     for i=1,config.threads do
       mnp.log("NODE","Worker "..i.." "..Threads[i]:status().." "..ThreadStatus[i])
+    end
+    mnp.log("NODE","--DNS--------------------")
+    for c_ip,c_domain in pairs(mnp.domains) do
+      mnp.log("NODE",c_ip.." - "..c_domain)
     end
     mnp.log("NODE","-------------------------")
   elseif id=="key_down" and port==38 then
@@ -179,4 +201,4 @@ while true do
 end
 os.sleep(0.5) --wait until all threads stop
 mnp.log("NODE","Program exited")
---TODO: DEAD THREADS CHECK
+--node protocol

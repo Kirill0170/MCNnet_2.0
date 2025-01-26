@@ -2,6 +2,7 @@
 --Modem is required.
 local dolog = true --log?
 local ttllog = true --log ttl discardment?
+local bannedFileName="/etc/banned.st"
 local component = require("component")
 local computer = require("computer")
 local ser = require("serialization")
@@ -11,7 +12,7 @@ local modem = component.modem
 local event = require("event")
 local ip = require("ipv2")
 local gpu = component.gpu
-local mnp_ver = "2.6.0"
+local mnp_ver = "2.6.3"
 local mncp_ver = "2.4"
 local ports = {}
 ports["mnp_reg"] = 1000
@@ -21,6 +22,7 @@ ports["mncp_srvc"] = 1003
 ports["mncp_err"] = 1004
 ports["mncp_ping"] = 1005
 local mnp = {}
+mnp.banned={} --list of banned client UUIDs
 mnp.mncp={}
 mnp.networkName = "default" --default network name
 mnp.domains={} --[ipv2]="domain"
@@ -50,7 +52,7 @@ function mnp.log(mod,text, crit)
 	end
 end
 --init-----------------------------------
-function mnp.logVersions() 
+function mnp.logVersions()
 	mnp.log("MNP","MNP version " .. mnp_ver)
 	mnp.log("MNP","MNCP version " .. mncp_ver)
 	mnp.log("MNP","NP version " .. netpacket.ver())
@@ -98,13 +100,57 @@ end
 function mnp.getPort(keyword)
 	return ports[keyword]
 end
+function mnp.networkPass(data)
+	local sendto={}
+	for n_ip,n_uuid in pairs(ip.getNodes()) do
+		if not data[2][n_ip] then
+			data[2][n_ip]=true
+			sendto[n_ip]=n_uuid
+		end
+	end
+	for n_ip,n_uuid in pairs(sendto) do
+		local np=netpacket.newPacket()
+		modem.send(n_uuid,ports["mnp_data"],"netdata",ser.serialize(np),ser.serialize(data))
+	end
+end
+function mnp.networkSend(mtype,data) --for other nodes
+	local sdata={mtype,{},data}
+	sdata[2][ip.gnip()]=true
+	mnp.networkPass(sdata)
+end
 --DNS-
 function mnp.setDomain(np,domain)
 	if not mnp.checkHostname(domain[1]) then return false end
 	if not netpacket.checkPacket(np) then return false end
 	mnp.log("MNP","Setting domain "..domain[1].." for "..np["route"][0])
 	mnp.domains[np["route"][0]]=domain[1]
+	--send
+	mnp.networkSend("netdomain",{np["route"][0],domain[1]})
 	return true
+end
+function mnp.addDomain(data)
+	if ip.isIPv2(data[1]) and mnp.checkHostname(data[2]) then
+		mnp.log("MNP","Adding domain "..data[2].." for "..data[1])
+		mnp.domains[data[1]]=data[2]
+		return true
+	end
+	return false
+end
+function mnp.removeDomain(data)
+	if ip.isIPv2(data[1]) then
+		mnp.domains[data[1]]=nil
+		return true
+	end
+	return false
+end
+function mnp.returnDomain(from,data)
+	for d_ip,domain in pairs(mnp.domains) do
+		if domain==data[1] then
+			modem.send(from,ports["mnp_srch"],"getdomain",ser.serialize(netpacket.newPacket()),ser.serialize({d_ip}))
+			return true
+		end
+	end
+	modem.send(from,ports["mnp_srch"],"getdomain",ser.serialize(netpacket.newPacket()),ser.serialize({"none"}))
 end
 --Main-
 function mnp.closeNode()
@@ -117,6 +163,11 @@ function mnp.closeNode()
 end
 function mnp.networkDisconnect(from)
 	local deleted_ip=ip.deleteUUID(from)
+	if mnp.domains[deleted_ip] then
+		mnp.log("MNP","Deleting domain "..mnp.domains[deleted_ip])
+		mnp.networkSend("deldomain",{deleted_ip})
+		mnp.domains[deleted_ip]=nil
+	end
 	mnp.log("MNP","Disconnected: "..tostring(deleted_ip))
 end
 function mnp.networkSearch(from, np, data,requirePassword) --allows finding
@@ -129,7 +180,6 @@ function mnp.networkSearch(from, np, data,requirePassword) --allows finding
 	for _,name in pairs(data) do
 		if mnp.networkName == name[1] then
 			respond = false
-			print(name[1],respond)
 		end
 	end
 	if respond then
@@ -159,10 +209,11 @@ function mnp.networkConnect(from,np,data,passwords)
 			end
 		end
 		local ipstr
+		print(tostring(data[3]==true))
 		if data[3]==true then
-			ipstr=ip.addStaticUUID(from)
-		else
 			ipstr=ip.addDynamicUUID(from)
+		else
+			ipstr=ip.addStaticUUID(from)
 		end
 		if not ipstr then mnp.log("MNP","Couldn't make an IPv2 :(",2) return false end
 		modem.send(from, ports["mnp_reg"], "netconnect", rnp, ser.serialize({mnp.networkName,ipstr}))
@@ -186,7 +237,7 @@ function mnp.networkConnect(from,np,data,passwords)
 				return false
 			end
 		end
-		modem.send(from, ports["mnp_reg"], "netconnect", rnp, ser.serialize({ "ok" }))
+		modem.send(from, ports["mnp_reg"], "netconnect", rnp, ser.serialize(mnp.domains))
 		ip.addStaticUUID(from, true)
 		mnp.log("MNP","New node connected: "..np["route"][0])
 		return true
@@ -214,15 +265,24 @@ function mnp.nodeConnect(connectTime,password) --on node start, call this
 	local found = {} --for found ips
 	while not exit do
 		modem.broadcast(ports["mnp_reg"], "netconnect", ser.serialize(rnp), ser.serialize({mnp.networkName,found,password}))
-		local id, name, from, port, dist, mtype, np = event.pullMultiple("interrupted", "timeout", "modem")
-		if id == "timeout" or id == "interrupted" then
+		local id, name, from, port, dist, mtype, np, data = event.pullMultiple("interrupted", "timeout", "modem")
+		if (id=="timeout" and name==timerName)or id == "interrupted" then
 			exit = true
 			mnp.log("MNP","timeout")
 		elseif mtype=="netconnect" then
 			np = ser.unserialize(np)
+			if data then data=ser.unserialize(data) end --dns table
 			if ip.isIPv2(np["route"][0], true) then
 				table.insert(found, np["route"][0])
 				ip.addStaticUUID(from, true)
+				--dns 
+				if data then
+					for d_ip,domain in pairs(data) do
+						if mnp.checkHostname(domain) and ip.isIPv2(d_ip) then
+							mnp.domains[d_ip]=domain
+						end
+					end
+				end
 				mnp.log("MNP","registered new node")
 			end
 		elseif mtype=="netforbidden" then
@@ -231,24 +291,20 @@ function mnp.nodeConnect(connectTime,password) --on node start, call this
 	end
 	return true
 end
-function mnp.search(from,np,data)
+function mnp.search(from,np)
 	if not ip.isUUID(from) or not netpacket.checkPacket(np) then
 		mnp.log("MNP","Unvalid arguments for search", 2)
 		return false
 	end
-	local dns=false
-	if data then
-		if mnp.checkHostname(data[1]) then dns=true end
-	end
-	if np["ttl"] <= 1 then
+	if np["ttl"]<=1 then
 		if ttllog then mnp.log("MNP","Packet"..np["uuid"].." dropped: TTL = 0",1) end
 		return false
 	end
-	if np["f"] == true then --return
-		local to_i = 0
-		for i = 0, #np["route"] do
-			if np["route"][i] == ip.gnip() then
-				to_i = i - 1
+	if np["f"]==true then --return
+		local to_i=0
+		for i=0, #np["route"] do
+			if np["route"][i]==ip.gnip() then
+				to_i=i-1
 				break
 			end
 		end
@@ -259,8 +315,7 @@ function mnp.search(from,np,data)
 		end
 		--SAVE[TODO]
 
-		if not dns then modem.send(to_uuid, ports["mnp_srch"], "search", ser.serialize(np))
-		else modem.send(to_uuid, ports["mnp_srch"], "search", ser.serialize(np),ser.serialize(data)) end
+		modem.send(to_uuid, ports["mnp_srch"], "search", ser.serialize(np))
 	else
 		--check if no current
 		if np["route"][#np["route"]] ~= ip.gnip() then
@@ -268,25 +323,12 @@ function mnp.search(from,np,data)
 		end
 		--check local
 		for n_ip, n_uuid in pairs(ip.getAll()) do
-			if dns then
-				if mnp.domains[n_ip] then
-					if mnp.domains[n_ip] == data[1] then
-						np["f"] = true
-						np["r"] = true
-						np = netpacket.addIp(np, n_ip)
-						data[2]=n_ip
-						modem.send(from, ports["mnp_srch"], "search", ser.serialize(np),ser.serialize(data))
-						return true
-					end
-				end
-			else
-				if n_ip == np["t"] then --found
-					np["f"] = true
-					np["r"] = true
-					np = netpacket.addIp(np, n_ip)
-					modem.send(from, ports["mnp_srch"], "search", ser.serialize(np))
-					return true
-				end
+			if n_ip == np["t"] then --found
+				np["f"] = true
+				np["r"] = true
+				np = netpacket.addIp(np, n_ip)
+				modem.send(from, ports["mnp_srch"], "search", ser.serialize(np))
+				return true
 			end
 		end
 		--CHECK SAVED[TODO]
@@ -302,8 +344,7 @@ function mnp.search(from,np,data)
 			local snp = np
 			snp = netpacket.addIp(snp, n_ip)
 			snp["ttl"] = np["ttl"] - 1
-			if not dns then modem.send(n_uuid, ports["mnp_srch"], "search", ser.serialize(snp))
-			else modem.send(n_uuid, ports["mnp_srch"], "search", ser.serialize(snp),ser.serialize(data)) end
+			modem.send(n_uuid, ports["mnp_srch"], "search", ser.serialize(snp))
 		end
 	end
 end
