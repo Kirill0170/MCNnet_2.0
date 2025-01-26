@@ -1,5 +1,5 @@
 --MNP CONNECTION MANAGER for client
-local ver="ALPHA 0.9.12"
+local ver="ALPHA 0.9.13"
 local filename="/etc/.cm_last_netuuid"
 local mnp=require("cmnp")
 local ip=require("ipv2")
@@ -31,6 +31,7 @@ connect <name>         connect to network by name;
 status (s)             current connection status
 disconnect (d)         disconnect from network
 reconnect  (rc)        disconnect & connect
+setdomain  (sd)        set domain
 nping (np)<n> <t>      ping node
 c2cping (ping) [dest]  Client-to-Client pinging
 reset                  reset all saved MNP data
@@ -142,7 +143,10 @@ local function netsearch(s,p)
   end
 end
 
-local function connect(name)
+local function connect(name,force_dynamic)
+  if force_dynamic==nil then
+    force_dynamic=false
+  end
   mnp.openPorts()
   local address,password,node_ip
   if not name then--check previous name
@@ -157,14 +161,14 @@ local function connect(name)
   if mnp.isConnected() then mnp.disconnect() end
   print("Trying to connect to "..name.." ("..node_ip..")")
   savePrevAddress(address)
-  local check,password_required=mnp.networkConnectByName(address,name,password)
+  local check,password_required=mnp.networkConnectByName(address,name,password,force_dynamic)
   if check then cprint("Connected successfully",0x33cc33)
   elseif password_required then
     term.write("Enter network password: ")
     local new_password=term.read({},false,{},"*")
     new_password=string.sub(new_password,1,#new_password-1)
     term.write("\n")
-    if mnp.networkConnectByName(address,node_ip,new_password) then
+    if mnp.networkConnectByName(address,name,new_password,force_dynamic) then
       cprint("Connected successfully",0x33cc33)
       mnp.addNodePassword(node_ip,new_password)
     else
@@ -257,6 +261,15 @@ local function reset()
     os.remove("/etc/mnp/SavedDomains.st")
   end
 end
+local function setdomain(name)
+  if name then
+    if mnp.setDomain(name) then
+      cprint("Successfully set domain to "..name,0x33cc33)
+      return true
+    end
+  end
+  cprint("Couldn't set domain",0xff0000)
+end
 --main
 local args,ops = shell.parse(...)
 if not args and not ops then help()
@@ -279,8 +292,9 @@ elseif args[1]=="status" or args[1]=="s" then status()
 elseif args[1]=="netsearch" or args[1]=="ns" then netsearch(ops["s"],ops["p"])
 elseif args[1]=="nping" or args[1]=="np" then pingNode(ops["n"],ops["t"])
 elseif args[1]=="c2cping" or args[1]=="ping" then c2cping(ops["n"],ops["t"],args[2])
-elseif args[1]=="connect" or args[1]=="c" then connect(args[2])
+elseif args[1]=="connect" or args[1]=="c" then connect(args[2],ops["d"])
 elseif args[1]=="reconnect" or args[1]=="rc" then reconnect()
+elseif args[1]=="setdomain" or args[1]=="sd" then setdomain(args[2])
 elseif args[1]=="reset" then reset()
 elseif args[1]=="help" then help()
 elseif args[1]=="ver" then versions()
