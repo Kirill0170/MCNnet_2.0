@@ -2,6 +2,7 @@
 --Modem is required.
 local dolog = true --log?
 local ttllog = true --log ttl discardment?
+local enableDynamic=true --enable dynamic IPv2?
 local bannedFileName="/etc/banned.st"
 local component = require("component")
 local computer = require("computer")
@@ -12,7 +13,7 @@ local modem = component.modem
 local event = require("event")
 local ip = require("ipv2")
 local gpu = component.gpu
-local mnp_ver = "2.6.3"
+local mnp_ver = "2.6.3b"
 local mncp_ver = "2.4"
 local ports = {}
 ports["mnp_reg"] = 1000
@@ -85,6 +86,9 @@ end
 function mnp.toggleLogs(tLog,tTTL)
 	if type(tLog)=="boolean" then dolog =tLog end
 	if type(tTTL)=="boolean" then ttllog=tTTL end
+end
+function mnp.toggleDynamicIPv2(toggle)
+	if type(toggle)=="boolean" then enableDynamic=toggle end
 end
 function mnp.openPorts(plog)
 	for name, port in pairs(ports) do
@@ -208,9 +212,13 @@ function mnp.networkConnect(from,np,data,passwords)
 				return false
 			end
 		end
+		--check if already connected
+		if ip.findIP(from) then
+			ip.deleteUUID(from)
+		end
 		local ipstr
 		print(tostring(data[3]==true))
-		if data[3]==true then
+		if data[3]==true and enableDynamic==true then
 			ipstr=ip.addDynamicUUID(from)
 		else
 			ipstr=ip.addStaticUUID(from)
@@ -242,7 +250,7 @@ function mnp.networkConnect(from,np,data,passwords)
 		mnp.log("MNP","New node connected: "..np["route"][0])
 		return true
 	else
-		mnp.log("MNP","unknown ip, possibly un-disconnected client",1)
+		mnp.log("MNP","unknown ip: "..tostring(np["route"][0])..", possibly un-disconnected client",1)
 		return false
 	end
 end

@@ -1,5 +1,5 @@
 --Node (beta)
-local node_ver="[beta3 devbuild4]"
+local node_ver="[beta3 devbuild5]"
 local configFile="/etc/node.cfg"
 local component=require("component")
 local computer=require("computer")
@@ -85,7 +85,7 @@ mnp.log("NODE","Node "..node_ver.." Starting - Hello World!")
 mnp.log("NODE","Reading config")
 if not require("filesystem").exists(configFile) then
   mnp.log("NODE","Couldn't open config file",1)
-  mnp.log("NODE","Continuing with default args: Internet \"\" \"\" 2 true true true 4",1)
+  mnp.log("NODE","Continuing with default args: Internet \"\" \"\" 2 true true true 4 true",1)
   config.netName="Internet"
   config.clientPassword=""
   config.nodePassword=""
@@ -94,6 +94,7 @@ if not require("filesystem").exists(configFile) then
   config.logTTL=true
   config.clearNIPS=true
   config.threads=4
+  config.enableDynIPv2=true
   local file=io.open(configFile,"w")
   if not file then
     mnp.log('NODE',"Couldn't open "..configFile.." to write!",2)
@@ -119,6 +120,7 @@ mnp.log("NODE","Setting up MNP..")
 mnp.logVersions()
 if not mnp.openPorts() then mnp.log("NODE","Could not open ports",3) end
 mnp.setNetworkName(config.netName)
+mnp.toggleDynamicIPv2(config.enableDynIPv2)
 mnp.log("NODE","Connecting to other nodes with "..config.netName.." name...")
 mnp.log("NODE","Should take "..config.searchTime.." seconds, as described in "..configFile)
 if not mnp.nodeConnect(config.searchTime,config.nodePassword) then mnp.log("NODE","Could not set connect to other nodes: check if ip is set?",3) end
