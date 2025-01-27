@@ -1,5 +1,5 @@
 --MNP CONNECTION MANAGER for client
-local ver="ALPHA 0.9.13"
+local ver="ALPHA 0.9.13.2"
 local filename="/etc/.cm_last_netuuid"
 local mnp=require("cmnp")
 local ip=require("ipv2")
@@ -42,6 +42,7 @@ reset                  reset all saved MNP data
   print("-p             Print logs")
   print("--t=<int>      Timeout time(for ping)")
   print("--n=<int>      Number of iterations(for ping & search)")
+  print("--static       For static IPv2 assignment")
 end
 local function versions()
   cprint("MNP Client Connection Manager",0xFFCC33)
@@ -68,6 +69,10 @@ local function status()
     return false
   end
   print("This computer's IP is: "..this_ip)
+  local n,c=ip.getParts(this_ip)
+  if c~=string.sub(require("component").address,1,4) then
+    print("Dynamic IPv2 enabled!")
+  end
   if mnp.isConnected(true) then
     cprint("Connected!",0x33CC33)
     cprint("Network name: "..mnp.getSavedNodeName(loadPrevAddress()),0x33CC33)
@@ -89,7 +94,7 @@ local function printDist(str1,str2)
 end
 
 
-local function netsearch(s,p)
+local function netsearch(force_static)
   print("Searching for networks...")
   local rsi=mnp.networkSearch(5,true) --res[node ip]={name,from,dist,requirePassword}
   if not next(rsi) then cprint("No networks found",0xFFCC33)
@@ -143,9 +148,9 @@ local function netsearch(s,p)
   end
 end
 
-local function connect(name,force_dynamic)
-  if force_dynamic==nil then
-    force_dynamic=false
+local function connect(name,force_static)
+  if force_static==nil then
+    force_static=false
   end
   mnp.openPorts()
   local address,password,node_ip
@@ -155,20 +160,20 @@ local function connect(name,force_dynamic)
   else
     address,password,node_ip=mnp.getSavedNode(name)
   end
-  if not address then
+  if not name then
     cprint("Saved node addresses not found. Use 'cm netsearch' to search for networks",0xFFCC33)
     return false end
   if mnp.isConnected() then mnp.disconnect() end
   print("Trying to connect to "..name.." ("..node_ip..")")
   savePrevAddress(address)
-  local check,password_required=mnp.networkConnectByName(address,name,password,force_dynamic)
+  local check,password_required=mnp.networkConnectByName(address,name,password,not force_static)
   if check then cprint("Connected successfully",0x33cc33)
   elseif password_required then
     term.write("Enter network password: ")
     local new_password=term.read({},false,{},"*")
     new_password=string.sub(new_password,1,#new_password-1)
     term.write("\n")
-    if mnp.networkConnectByName(address,name,new_password,force_dynamic) then
+    if mnp.networkConnectByName(address,name,new_password,not force_static) then
       cprint("Connected successfully",0x33cc33)
       mnp.addNodePassword(node_ip,new_password)
     else
@@ -289,10 +294,10 @@ else ops["n"]=10 end
 
 if args[1]=="disconnect" or args[1]=="d" then disconnect()
 elseif args[1]=="status" or args[1]=="s" then status()
-elseif args[1]=="netsearch" or args[1]=="ns" then netsearch(ops["s"],ops["p"])
+elseif args[1]=="netsearch" or args[1]=="ns" then netsearch(ops["static"])
 elseif args[1]=="nping" or args[1]=="np" then pingNode(ops["n"],ops["t"])
 elseif args[1]=="c2cping" or args[1]=="ping" then c2cping(ops["n"],ops["t"],args[2])
-elseif args[1]=="connect" or args[1]=="c" then connect(args[2],ops["d"])
+elseif args[1]=="connect" or args[1]=="c" then connect(args[2],ops["static"])
 elseif args[1]=="reconnect" or args[1]=="rc" then reconnect()
 elseif args[1]=="setdomain" or args[1]=="sd" then setdomain(args[2])
 elseif args[1]=="reset" then reset()
