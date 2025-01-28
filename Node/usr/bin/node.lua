@@ -22,53 +22,85 @@ local function packetThread(thread_id)
   while run do
     local id,from,port,mtype,np,data=event.pullMultiple("packet"..thread_id,"stop"..thread_id)
     if id=="stop"..thread_id then run=false break end
-    ThreadStatus[thread_id]="busy"
-    if not np then mnp.log("Worker"..thread_id,"No packet info received") return false end
-    np=ser.unserialize(np)
-    if data then data=ser.unserialize(data) end
-    if not netpacket.checkPacket(np) then
-      mnp.log("Worker"..thread_id,"Incorrect packet received",1)
+    if not mnp.banned[from] then
+      ThreadStatus[thread_id]="busy"
+      if not np then mnp.log("Worker"..thread_id,"No packet info received") return false end
+      np=ser.unserialize(np)
+      if data then data=ser.unserialize(data) end
+      if not netpacket.checkPacket(np) then
+        mnp.log("Worker"..thread_id,"Incorrect packet received",1)
+        ThreadStatus[thread_id]="idle"
+      end
+      if not ip.findIP(from) and mtype~="netconnect" and mtype~="netsearch" then
+        mnp.log("Worker"..thread_id,"Non-connected client! IP: "..np["route"][0].." mtype: "..mtype,1)
+        ThreadStatus[thread_id]="idle"
+      elseif mtype=="netconnect" then
+        mnp.networkConnect(from,np,data,{config.clientPassword,config.nodePassword})
+      elseif mtype=="netdisconnect" then
+        mnp.networkDisconnect(from)
+      elseif mtype=="netsearch" then
+        mnp.networkSearch(from,np,data,config.clientPassword~="")
+      elseif mtype=="search" then
+        mnp.search(from,np)
+      elseif mtype=="mncp_ping" then
+        mnp.mncp.nodePing(from)
+      elseif mtype=="netdata" and ip.isIPv2(ip.findIP(from),true) then
+        if passlog then
+          mnp.log("NETPASS"..str,np["route"][0].."->"..np["t"].." "..ser.serialize(data))
+        end
+        local nmtype=data[1]
+        local nmdata=data[3]
+        if nmtype=="netdomain" then
+          print("netdomain!",ser.serialize(nmdata))
+          mnp.addDomain(nmdata)
+        elseif nmtype=="deldomain" then
+          mnp.removeDomain(nmdata)
+        elseif nmtype=="addban" then
+          mnp.addBanned(from)
+        elseif nmtype=="removeban" then
+          mnp.removeBanned(from)
+        end
+        mnp.networkPass(data)
+      elseif mtype=="nadm" then
+        print(ser.serialize(data))
+        print(tostring(data[2]))
+        local np=ser.serialize(netpacket.newPacket())
+        if data[2]==config.nodePassword then
+          --adminutils
+          local rdata={"fail","unknown"}
+          if data[1]=="ban" then
+            mnp.ban(data[3])
+            rdata={"success"}
+          elseif data[1]=="banip" then
+            if ip.findUUID(data[3]) then
+              mnp.ban(ip.findUUID(data[3]))
+              rdata={"success"}
+            else
+              rdata={"fail","No such IPv2 connected to this node!"}
+            end
+          elseif data[1]=="list" then
+            rdata={"list",{},{}}
+            rdata[2]=ip.getAll()
+            rdata[3]=mnp.domains
+          end
+          modem.send(from,1002,"nadm",np,ser.serialize(rdata))
+        else
+          modem.send(from,1002,"nadm",np,ser.serialize({"fail","Wrong node password!"}))
+        end
+      elseif mtype=="setdomain" then
+        mnp.setDomain(np,data)
+      elseif mtype=="getdomain" then
+        mnp.returnDomain(from,data)
+      else --data
+        if passlog then
+          mnp.log("PASS"..str,np["route"][0].."->"..np["t"].." "..ser.serialize(data))
+        end
+        mnp.pass(port,mtype,np,data)
+      end
       ThreadStatus[thread_id]="idle"
+    else
+      --banned
     end
-    if not ip.findIP(from) and mtype~="netconnect" and mtype~="netsearch" then
-      mnp.log("Worker"..thread_id,"Non-connected client! IP: "..np["route"][0].." mtype: "..mtype,1)
-      ThreadStatus[thread_id]="idle"
-    elseif mtype=="netconnect" then
-      mnp.networkConnect(from,np,data,{config.clientPassword,config.nodePassword})
-    elseif mtype=="netdisconnect" then
-      mnp.networkDisconnect(from)
-    elseif mtype=="netsearch" then
-      mnp.networkSearch(from,np,data,config.clientPassword~="")
-    elseif mtype=="search" then
-      mnp.search(from,np)
-    elseif mtype=="mncp_ping" then
-      mnp.mncp.nodePing(from)
-    elseif mtype=="netdata" then
-      if passlog then
-        mnp.log("NETPASS"..str,np["route"][0].."->"..np["t"].." "..ser.serialize(data))
-      end
-      local nmtype=data[1]
-      local nmdata=data[3]
-      if nmtype=="netdomain" then
-        print("netdomain!",ser.serialize(nmdata))
-        mnp.addDomain(nmdata)
-      elseif nmtype=="deldomain" then
-        mnp.removeDomain(nmdata)
-      elseif nmtype=="" then
-
-      end
-      mnp.networkPass(data)
-    elseif mtype=="setdomain" then
-      mnp.setDomain(np,data)
-    elseif mtype=="getdomain" then
-      mnp.returnDomain(from,data)
-    else --data
-      if passlog then
-        mnp.log("PASS"..str,np["route"][0].."->"..np["t"].." "..ser.serialize(data))
-      end
-      mnp.pass(port,mtype,np,data)
-    end
-    ThreadStatus[thread_id]="idle"
   end
   mnp.log("Worker"..thread_id,"Offline")
 end
@@ -88,7 +120,7 @@ if not require("filesystem").exists(configFile) then
   mnp.log("NODE","Continuing with default args: Internet \"\" \"\" 2 true true true 4 true",1)
   config.netName="Internet"
   config.clientPassword=""
-  config.nodePassword=""
+  config.nodePassword="1234"
   config.searchTime=2
   config.log=true
   config.logTTL=true

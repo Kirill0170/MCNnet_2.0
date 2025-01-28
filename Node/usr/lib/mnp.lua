@@ -13,7 +13,7 @@ local modem = component.modem
 local event = require("event")
 local ip = require("ipv2")
 local gpu = component.gpu
-local mnp_ver = "2.6.3b"
+local mnp_ver = "2.6.3c"
 local mncp_ver = "2.4"
 local ports = {}
 ports["mnp_reg"] = 1000
@@ -155,6 +155,27 @@ function mnp.returnDomain(from,data)
 		end
 	end
 	modem.send(from,ports["mnp_srch"],"getdomain",ser.serialize(netpacket.newPacket()),ser.serialize({"none"}))
+end
+--Bans-
+function mnp.ban(from)
+	if ip.isUUID(from) then
+		mnp.addBanned(from)
+		mnp.networkSend("addban",{from})
+	end
+end
+function mnp.addBanned(from)
+	if ip.isUUID(from) then
+		mnp.banned[from]=true
+		if ip.findIP(from) then
+			mnp.networkDisconnect(from)
+		end
+		mnp.log("MNP","Banned: "..from)
+	end
+end
+function mnp.removeBanned(from)
+	if ip.isUUID(from) then
+		mnp.banned[from]=nil
+	end
 end
 --Main-
 function mnp.closeNode()

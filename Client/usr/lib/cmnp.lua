@@ -316,56 +316,6 @@ function mnp.saveRoute(to_ip,route)
   saved[this_ip][to_ip]=route
   mnp.saveRoutes(saved)
 end
------------Saving searched domians-----------
--- function mnp.loadDomains()
---   local file=io.open(domainSaveFileName,"r")
---   if not file then --initialize file
---     file=io.open(domainSaveFileName,"w")
---     if not file then
---       error("Can't open file to write: "..domainSaveFileName)
---     end
---     file:write(ser.serialize({}))
---     file:close()
---     return {}
---   end
---   local savedata=ser.unserialize(file:read("*a"))
---   file:close()
---   local savedata2={}
---   --checks
---   if type(savedata)~="table" then 
---     file=io.open(domainSaveFileName,"w")
---     if not file then
---       error("Can't open file to write: "..domainSaveFileName)
---     end
---     file:write(ser.serialize({}))
---     file:close()
---     return {}
---   end
---   for domain,data in pairs(savedata) do
---     if mnp.checkHostname(domain) and ip.isIPv2(data[1]) then
---       savedata2[domain]=data
---     end
---   end
---   return savedata2
--- end
--- function mnp.saveDomain(domain,to_ip)
---   if not mnp.checkHostname(domain) or not ip.isIPv2(to_ip) then return false end
---   local saved=mnp.loadDomains()
---   saved[domain]={to_ip}
---   local file=io.open(domainSaveFileName,"w")
---   if not file then
---     error("Can't open file to write: "..domainSaveFileName)
---   end
---   file:write(ser.serialize(saved))
---   file:close()
---   return true
--- end
--- function mnp.getFromDomain(domain)
---   if not mnp.checkHostname(domain) then return nil end
---   local saved=mnp.loadDomains()
---   if saved=={} then return nil end
---   return saved[domain]
--- end
 -----------Main-----------------
 function mnp.networkSearch(searchTime,save)
   if not searchTime then searchTime=10 end

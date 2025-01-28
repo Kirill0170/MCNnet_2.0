@@ -70,7 +70,7 @@ local function status()
   end
   print("This computer's IP is: "..this_ip)
   local n,c=ip.getParts(this_ip)
-  if c~=string.sub(require("component").address,1,4) then
+  if c~=string.sub(require("component").modem.address,1,4) then
     print("Dynamic IPv2 enabled!")
   end
   if mnp.isConnected(true) then
