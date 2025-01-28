@@ -13,7 +13,7 @@ local modem = component.modem
 local event = require("event")
 local ip = require("ipv2")
 local gpu = component.gpu
-local mnp_ver = "2.6.3c"
+local mnp_ver = "2.6.3d"
 local mncp_ver = "2.4"
 local ports = {}
 ports["mnp_reg"] = 1000
@@ -161,7 +161,18 @@ function mnp.ban(from)
 	if ip.isUUID(from) then
 		mnp.addBanned(from)
 		mnp.networkSend("addban",{from})
+		return true
 	end
+	return false
+end
+function mnp.unban(from)
+	if ip.isUUID(from) then
+		if mnp.banned[from] then
+			mnp.removeBanned(from)
+			mnp.networkSend("removeban",{from})
+		end
+	end
+	return false
 end
 function mnp.addBanned(from)
 	if ip.isUUID(from) then

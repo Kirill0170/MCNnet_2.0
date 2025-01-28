@@ -1,5 +1,5 @@
 --NODE Admin client
-local ver="1.0.0"
+local ver="1.1.0"
 local mnp=require("cmnp")
 local term=require("term")
 local shell=require("shell")
@@ -66,6 +66,12 @@ local function ban(uuid)
   modem.send(os.getenv("node_uuid"),1002,"nadm",np,ser.serialize({"ban",node_password,uuid}))
   status()
 end
+local function unban(uuid)
+  if not ip.isUUID(uuid) then cprint("You should give an UUID!",0xFF0000) return false end
+  getPassword()
+  modem.send(os.getenv("node_uuid"),1002,"nadm",np,ser.serialize({"unban",node_password,uuid}))
+  status()
+end
 local function banip(n_ip)
   if not ip.isIPv2(n_ip) then cprint("You should give a valid IPv2!",0xFF0000) return false end
   getPassword()
@@ -101,7 +107,7 @@ local function list()
     print(str..l_ip.." "..l_uuid)
   end
   print("--DNS----------------")
-  for domain,l_ip in pairs(rdata[2]) do
+  for domain,l_ip in pairs(rdata[3]) do
     print(domain.." - "..l_ip)
   end
 end
@@ -116,6 +122,7 @@ if not args and not ops then help()
 elseif ops["h"] or ops["help"] then help()
 elseif args[1]=="help" then help()
 elseif args[1]=="ban" then ban(args[2])
+elseif args[1]=="unban" then unban(args[2])
 elseif args[1]=="banip" then banip(args[2])
 elseif args[1]=="list" then list()
 else help() end

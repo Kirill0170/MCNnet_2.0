@@ -1,5 +1,5 @@
 --Node (beta)
-local node_ver="[beta3 devbuild5]"
+local node_ver="[beta4 build1]"
 local configFile="/etc/node.cfg"
 local component=require("component")
 local computer=require("computer")
@@ -51,7 +51,6 @@ local function packetThread(thread_id)
         local nmtype=data[1]
         local nmdata=data[3]
         if nmtype=="netdomain" then
-          print("netdomain!",ser.serialize(nmdata))
           mnp.addDomain(nmdata)
         elseif nmtype=="deldomain" then
           mnp.removeDomain(nmdata)
@@ -62,8 +61,6 @@ local function packetThread(thread_id)
         end
         mnp.networkPass(data)
       elseif mtype=="nadm" then
-        print(ser.serialize(data))
-        print(tostring(data[2]))
         local np=ser.serialize(netpacket.newPacket())
         if data[2]==config.nodePassword then
           --adminutils
@@ -77,6 +74,12 @@ local function packetThread(thread_id)
               rdata={"success"}
             else
               rdata={"fail","No such IPv2 connected to this node!"}
+            end
+          elseif data[1]=="unban" then
+            if mnp.unban(data[3]) then
+              rdata={"success"}
+            else
+              rdata={"fail","No such UUID banned!"}
             end
           elseif data[1]=="list" then
             rdata={"list",{},{}}

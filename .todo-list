@@ -1,8 +1,6 @@
 W: Package manager: package servers send updates to listserv
 MNP update
 FTP list
-MNP: network-wide admin operations:
-  get_network
 --future--
 UAP: security protocol for mcnnet
 some kind of rsh-like software
