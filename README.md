@@ -8,7 +8,11 @@ Advanced node networking for Open Computers, still under active development.
 * SSAP servers are working for use
 * FTP protocol for transmitting files
 * Domain names for servers
+* Dynamic IPv2 addresses
+* Network passwords & node administration utilities
 * WDP protocol for static .tdf websites
+* Web Browser 0.9
+* APM package manager!
 ## Planned:
 * Tunnel Nodes for cross-dimentional communication
 * UAP for logins
@@ -26,6 +30,7 @@ Servers will be able to have domain names, like "example.com".
 Servers are clients which are running some application and handle connections from another clients. There are different protocols of connecting to server, each designed to accomplish specific tasks. It is also possible to write your own protocol!
 # Protocols
 **[SSAP]** - (done)Simple Server Application Protocol, allows simple terminal connection with basic I/O facilities.  
-**[FTP]** - (done)simple File Transfer Protocol connection, however does not support TUI.  
+**[FTP]** - (done)simple File Transfer Protocol connection, however does not support TUI.
+**[WDP]** - Web Document Protocol - protocol for simple static webpages.
 **[SSTP]** - [Planned] Simple Site Transfer Protocol - graphical sites, as we know it.  
 **[UAP]** - Universal Auth Protocol, for managing logins.
