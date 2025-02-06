@@ -15,7 +15,7 @@ local thread=require("thread")
 local event=require("event")
 local ip=require("ipv2")
 local gpu=component.gpu
-local mnp_ver="2.6.3"
+local mnp_ver="2.6.3b"
 local mncp_ver="2.5"
 local ports={}
 ports["mnp_reg"]=1000
@@ -356,7 +356,7 @@ end
 function mnp.networkConnectByName(to_uuid,name,password,force_dynamic)
   if not name then return false end
   if not password then password="" end
-  if not force_dynamic then force_dynamic=true end
+  if type(force_dynamic)~="boolean" then force_dynamic=true end
   os.setenv("this_ip","0000:0000")
   os.setenv("node_uuid",nil)
   local rnp=netpacket.newPacket(os.getenv("this_ip"))--!!

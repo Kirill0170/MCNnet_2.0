@@ -1,4 +1,4 @@
-local version="1.7.2"
+local version="1.7.3"
 local component=require("component")
 local computer=require("computer")
 local fs=require("filesystem")
@@ -46,7 +46,7 @@ function ssap.ver() return version end
 --Main------------------------
 function ssap.server.connectionManager(filename) --no UAP support
   local fs=require("filesystem")
-  if not fs.exists("/lib/"..filename..".lua") then
+  if not fs.exists("/usr/lib/"..filename..".lua") then
     ssap.log("Couldn't start SSAP CM: no such file: "..filename,2)
     return false
   end
@@ -112,7 +112,7 @@ function ssap.server.connectionManager(filename) --no UAP support
   end
 end
 function ssap.server.application(filepath,to_ip)
-  if not require("filesystem").exists("/lib/"..filepath..".lua") then
+  if not require("filesystem").exists("/usr/lib/"..filepath..".lua") then
     ssap.log("Could not open application file",3)
   end
   local app=require(filepath)
