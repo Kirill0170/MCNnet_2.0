@@ -1,5 +1,5 @@
 --Node (beta)
-local node_ver="[beta4 build1]"
+local node_ver="[beta4 build3]"
 local configFile="/etc/node.cfg"
 local component=require("component")
 local computer=require("computer")
@@ -31,7 +31,7 @@ local function packetThread(thread_id)
         mnp.log("Worker"..thread_id,"Incorrect packet received",1)
         ThreadStatus[thread_id]="idle"
       end
-      if not ip.findIP(from) and mtype~="netconnect" and mtype~="netsearch" then
+      if not ip.findIP(from) and mtype~="netconnect" and mtype~="netsearch" and from~=mnp.tunnelUUID then
         mnp.log("Worker"..thread_id,"Non-connected client! IP: "..np["route"][0].." mtype: "..mtype,1)
         ThreadStatus[thread_id]="idle"
       elseif mtype=="netconnect" then
@@ -41,6 +41,9 @@ local function packetThread(thread_id)
       elseif mtype=="netsearch" then
         mnp.networkSearch(from,np,data,config.clientPassword~="")
       elseif mtype=="search" then
+        if passlog then
+          mnp.log("SRCH","search: "..ser.serialize(np))
+        end
         mnp.search(from,np)
       elseif mtype=="mncp_ping" then
         mnp.mncp.nodePing(from)
@@ -98,7 +101,7 @@ local function packetThread(thread_id)
         if passlog then
           mnp.log("PASS"..str,np["route"][0].."->"..np["t"].." "..ser.serialize(data))
         end
-        mnp.pass(port,mtype,np,data)
+        mnp.pass(mtype,np,data)
       end
       ThreadStatus[thread_id]="idle"
     else
@@ -156,6 +159,7 @@ mnp.logVersions()
 if not mnp.openPorts() then mnp.log("NODE","Could not open ports",3) end
 mnp.setNetworkName(config.netName)
 mnp.toggleDynamicIPv2(config.enableDynIPv2)
+mnp.checkTunnel(true)
 mnp.log("NODE","Connecting to other nodes with "..config.netName.." name...")
 mnp.log("NODE","Should take "..config.searchTime.." seconds, as described in "..configFile)
 if not mnp.nodeConnect(config.searchTime,config.nodePassword) then mnp.log("NODE","Could not set connect to other nodes: check if ip is set?",3) end

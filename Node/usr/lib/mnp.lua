@@ -1,4 +1,4 @@
---Mcn-net Networking Protocol v2.1 EXPERIMENTAL
+--Mcn-net Networking Protocol v2.7 EXPERIMENTAL
 --Modem is required.
 local dolog = true --log?
 local ttllog = true --log ttl discardment?
@@ -13,7 +13,7 @@ local modem = component.modem
 local event = require("event")
 local ip = require("ipv2")
 local gpu = component.gpu
-local mnp_ver = "2.6.3d"
+local mnp_ver = "2.7.0 dev"
 local mncp_ver = "2.4"
 local ports = {}
 ports["mnp_reg"] = 1000
@@ -23,9 +23,12 @@ ports["mncp_srvc"] = 1003
 ports["mncp_err"] = 1004
 ports["mncp_ping"] = 1005
 local mnp = {}
-mnp.banned={} --list of banned client UUIDs
 mnp.mncp={}
 mnp.networkName = "default" --default network name
+mnp.tunnelConnected=false --tunnel card support
+mnp.tunnelUUID=""
+mnp.tunnelIP=""
+mnp.banned={} --list of banned client UUIDs
 mnp.domains={} --[ipv2]="domain"
 function mnp.log(mod,text, crit)
 	if not mod then mod="MNP" end
@@ -104,6 +107,43 @@ end
 function mnp.getPort(keyword)
 	return ports[keyword]
 end
+function mnp.checkTunnel(checkConnect)
+	if component.isAvailable("tunnel") then
+		mnp.log("MNP","Found tunnel!")
+		if checkConnect then
+			mnp.log("MNP","Checking tunnel...")
+			component.tunnel.send("netconnect",ser.serialize(netpacket.newPacket()),ser.serialize({mnp.networkName,{},component.tunnel.getChannel()}))
+			local _,to,from,_,_,mtype,np=event.pull(2,"modem_message")
+			if not to then
+				mnp.log("MNP","Tunnel timeout. This node is first?",1)
+			elseif to~=component.getPrimary("tunnel").address then
+				mnp.log("MNP","Check failure!",2)
+				return false
+			elseif mtype=="netconnect" then
+				if np then
+					np=ser.unserialize(np)
+					if netpacket.checkPacket(np) then
+						mnp.tunnelConnected=true
+						mnp.tunnelIP=np["route"][0]
+						mnp.tunnelUUID=from
+						mnp.log("MNP","Tunnel connected: "..mnp.tunnelIP)
+						return true
+					end
+				end
+				mnp.log("MNP","Tunnel packet error!",1)
+				return false
+			else
+				mnp.log("MNP","Unknown mtype from tunnel",1)
+				return false
+			end
+		end
+		return true
+	else
+		mnp.log("MNP","Tunnel not found.")
+		mnp.tunnelConnected=false
+		return false
+	end
+end
 function mnp.networkPass(data)
 	local sendto={}
 	for n_ip,n_uuid in pairs(ip.getNodes()) do
@@ -115,6 +155,10 @@ function mnp.networkPass(data)
 	for n_ip,n_uuid in pairs(sendto) do
 		local np=netpacket.newPacket()
 		modem.send(n_uuid,ports["mnp_data"],"netdata",ser.serialize(np),ser.serialize(data))
+	end
+	if mnp.tunnelConnected then
+		local np=netpacket.newPacket()
+		component.tunnel.send("netdata",ser.serialize(np),ser.serialize(data))
 	end
 end
 function mnp.networkSend(mtype,data) --for other nodes
@@ -270,10 +314,20 @@ function mnp.networkConnect(from,np,data,passwords)
 			end
 		end
 		local rnp = ser.serialize(netpacket.newPacket())
+		if component.isAvailable("tunnel") then --no password check!
+			if data[3]==component.tunnel.getChannel() then
+				component.tunnel.send("netconnect",rnp)
+				mnp.tunnelConnected=true
+				mnp.tunnelIP=np["route"][0]
+				mnp.tunnelUUID=from
+				mnp.log("MNP","Tunnel connected: "..mnp.tunnelIP)
+				return true
+			end
+		end
 		--check password 
 		if passwords then
 			if data[3]~=passwords[2] then
-				modem.send(from,ports["mnp_reg"],"netforbidden",rnp,ser.serialize(){"You need a password!"})
+				modem.send(from,ports["mnp_reg"],"netforbidden",rnp,ser.serialize({"You need a password!"}))
 				return false
 			end
 		end
@@ -348,6 +402,11 @@ function mnp.search(from,np)
 				break
 			end
 		end
+		if mnp.tunnelConnected then
+			if np["route"][to_i]==mnp.tunnelIP then
+				component.tunnel.send("search",ser.serialize(np))
+			end
+		end
 		local to_uuid = ip.findUUID(np["route"][to_i])
 		if not to_uuid then
 			mnp.log("MNP","Couldn't find address to return to while returning search", 2)
@@ -367,6 +426,12 @@ function mnp.search(from,np)
 				np["f"] = true
 				np["r"] = true
 				np = netpacket.addIp(np, n_ip)
+				if mnp.tunnelConnected then
+					if from==mnp.tunnelUUID then
+						component.tunnel.send("search",ser.serialize(np))
+						return true
+					end
+				end
 				modem.send(from, ports["mnp_srch"], "search", ser.serialize(np))
 				return true
 			end
@@ -386,10 +451,17 @@ function mnp.search(from,np)
 			snp["ttl"] = np["ttl"] - 1
 			modem.send(n_uuid, ports["mnp_srch"], "search", ser.serialize(snp))
 		end
+		--tunnel 
+		if mnp.tunnelConnected then
+			local snp = np
+			snp = netpacket.addIp(snp,mnp.tunnelIP)
+			snp["ttl"] = np["ttl"]-1
+			component.tunnel.send("search",ser.serialize(snp))
+		end
 	end
 end
-function mnp.pass(port, mtype, np, data)
-	if not port or not mtype or not np then
+function mnp.pass(mtype, np, data)
+	if not mtype or not np then
 		return false
 	end
 	--check TTL
@@ -402,6 +474,12 @@ function mnp.pass(port, mtype, np, data)
 	end
 	if np["r"] == true then np["c"]=np["c"]-1
 	else np["c"]=np["c"]+1 end
+	if mnp.tunnelConnected then
+		if np["route"][np["c"]]==mnp.tunnelIP then
+			component.tunnel.send(mtype, ser.serialize(np), ser.serialize(data))
+		end
+		return true
+	end
 	local to = ip.findUUID(np["route"][np["c"]])
 	if not to then
 		mnp.log("MNP","Unsuccessful pass: Unknown IP", 2)
@@ -413,7 +491,7 @@ function mnp.pass(port, mtype, np, data)
 		mnp.log("MNP","Tried: "..tostring(np["c"]))
 		return false
 	end
-	modem.send(to, port, mtype, ser.serialize(np), ser.serialize(data))
+	modem.send(to, ports["mnp_data"], mtype, ser.serialize(np), ser.serialize(data))
 	return true
 end
 -------
