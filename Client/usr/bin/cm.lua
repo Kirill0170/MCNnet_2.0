@@ -1,5 +1,5 @@
 --MNP CONNECTION MANAGER for client
-local ver="ALPHA 0.9.13.2"
+local ver="ALPHA 0.9.13.3"
 local filename="/etc/.cm_last_netuuid"
 local mnp=require("cmnp")
 local ip=require("ipv2")
@@ -275,6 +275,10 @@ local function setdomain(name)
   end
   cprint("Couldn't set domain",0xff0000)
 end
+local function debugC2C()
+  mnp.toggleLog(true)
+  mnp.mncp.c2cPingService(true)
+end
 --main
 local args,ops = shell.parse(...)
 if not args and not ops then help()
@@ -292,6 +296,8 @@ if ops["n"] then
   ops["n"]=tonumber(ops["n"])
 else ops["n"]=10 end
 
+mnp.openPorts()
+
 if args[1]=="disconnect" or args[1]=="d" then disconnect()
 elseif args[1]=="status" or args[1]=="s" then status()
 elseif args[1]=="netsearch" or args[1]=="ns" then netsearch(ops["static"])
@@ -300,6 +306,7 @@ elseif args[1]=="c2cping" or args[1]=="ping" then c2cping(ops["n"],ops["t"],args
 elseif args[1]=="connect" or args[1]=="c" then connect(args[2],ops["static"])
 elseif args[1]=="reconnect" or args[1]=="rc" then reconnect()
 elseif args[1]=="setdomain" or args[1]=="sd" then setdomain(args[2])
+elseif args[1]=="debug" then debugC2C()
 elseif args[1]=="reset" then reset()
 elseif args[1]=="help" then help()
 elseif args[1]=="ver" then versions()
