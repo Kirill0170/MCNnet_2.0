@@ -13,7 +13,7 @@ local modem = component.modem
 local event = require("event")
 local ip = require("ipv2")
 local gpu = component.gpu
-local mnp_ver = "2.7.0 dev"
+local mnp_ver = "2.7.2"
 local mncp_ver = "2.4"
 local ports = {}
 ports["mnp_reg"] = 1000
@@ -144,9 +144,9 @@ function mnp.checkTunnel(checkConnect)
 		return false
 	end
 end
-function mnp.networkPass(data)
+function mnp.networkPass(from,data)
 	local sendto={}
-	for n_ip,n_uuid in pairs(ip.getNodes()) do
+	for n_ip,n_uuid in pairs(ip.getNodes(from)) do
 		if not data[2][n_ip] then
 			data[2][n_ip]=true
 			sendto[n_ip]=n_uuid
@@ -156,7 +156,7 @@ function mnp.networkPass(data)
 		local np=netpacket.newPacket()
 		modem.send(n_uuid,ports["mnp_data"],"netdata",ser.serialize(np),ser.serialize(data))
 	end
-	if mnp.tunnelConnected then
+	if mnp.tunnelConnected and from~=mnp.tunnelUUID then
 		local np=netpacket.newPacket()
 		component.tunnel.send("netdata",ser.serialize(np),ser.serialize(data))
 	end
@@ -164,14 +164,27 @@ end
 function mnp.networkSend(mtype,data) --for other nodes
 	local sdata={mtype,{},data}
 	sdata[2][ip.gnip()]=true
-	mnp.networkPass(sdata)
+	mnp.networkPass("",sdata)
 end
 --DNS-
-function mnp.setDomain(np,domain)
+function mnp.setDomain(from,np,domain)
 	if not mnp.checkHostname(domain[1]) then return false end
 	if not netpacket.checkPacket(np) then return false end
+	np["r"]=true
+	if mnp.banned[domain[1]] then
+		modem.send(from,ports["mnp_reg"],"setdomain",ser.serialize(np),"forbidden")
+		return false
+	end
+	for d_ip,d_domain in pairs(mnp.domains) do
+		if d_domain==domain[1] then
+			mnp.log("MNP","Domain "..domain[1].." already exists.")
+			modem.send(from,ports["mnp_reg"],"setdomain",ser.serialize(np),"exists")
+			return false
+		end
+	end
 	mnp.log("MNP","Setting domain "..domain[1].." for "..np["route"][0])
 	mnp.domains[np["route"][0]]=domain[1]
+	modem.send(from,ports["mnp_reg"],"setdomain",ser.serialize(np),"ok")
 	--send
 	mnp.networkSend("netdomain",{np["route"][0],domain[1]})
 	return true
@@ -191,6 +204,45 @@ function mnp.removeDomain(data)
 	end
 	return false
 end
+function mnp.banDomain(data)
+	if not mnp.checkHostname(data) then return false end
+	for d_ip,d_domain in pairs(mnp.domains) do
+		if d_domain==data then
+			mnp.removeDomain(d_ip)
+			mnp.networkSend("deldomain",data)
+		end
+	end
+	if mnp.banned[data] then
+		mnp.removeDomain(data)
+		mnp.networkSend("deldomain",data)
+	end
+	mnp.addBannedDomain(data)
+	mnp.networkSend("bandomain",data)
+	return true
+end
+function mnp.unbanDomain(data)
+	if mnp.banned[data] and mnp.checkHostname(data) then
+		mnp.banned[data]=nil
+		mnp.networkSend("unbandomain",data)
+		return true
+	end
+	return false
+end
+function mnp.addBannedDomain(data)
+	mnp.banned[data]=true
+	mnp.log("MNP","Banned domain: "..data)
+	for d_ip,domain in pairs(mnp.domains) do
+		if domain==data then
+			mnp.domains[d_ip]=nil
+		end
+	end
+end
+function mnp.removeBannedDomain(data)
+	if mnp.banned[data] and mnp.checkHostname(data) then
+		mnp.banned[data]=nil
+		mnp.log("MNP","Unbanned "..data)
+	end
+end
 function mnp.returnDomain(from,data)
 	for d_ip,domain in pairs(mnp.domains) do
 		if domain==data[1] then
@@ -204,7 +256,7 @@ end
 function mnp.ban(from)
 	if ip.isUUID(from) then
 		mnp.addBanned(from)
-		mnp.networkSend("addban",{from})
+		mnp.networkSend("addban",from)
 		return true
 	end
 	return false
@@ -213,7 +265,8 @@ function mnp.unban(from)
 	if ip.isUUID(from) then
 		if mnp.banned[from] then
 			mnp.removeBanned(from)
-			mnp.networkSend("removeban",{from})
+			mnp.networkSend("removeban",from)
+			return true
 		end
 	end
 	return false
@@ -229,13 +282,23 @@ function mnp.addBanned(from)
 end
 function mnp.removeBanned(from)
 	if ip.isUUID(from) then
+		mnp.log("MNP","Unbanned UUID: "..from)
 		mnp.banned[from]=nil
 	end
 end
 --Main-
 function mnp.closeNode()
-	mnp.log("MNP","Closing node, disconnecting everyone...")
+	mnp.log("MNP","Closing node...")
+	mnp.log("MNP","Checking if any domains are connected to this node..")
 	local nips = ip.getAll()
+	for n_ip, n_uuid in pairs(nips) do
+		if mnp.domains[n_ip] then --connected to this node, must close
+			mnp.log("MNP","Deleting domain "..mnp.domains[n_ip])
+			mnp.networkSend("deldomain",{n_ip})
+			mnp.domains[n_ip]=nil
+		end
+	end
+	mnp.log("MNP","Disconnecting everyone...")
 	for n_ip, n_uuid in pairs(nips) do
 		local np = ser.serialize(netpacket.newPacket(n_ip))
 		modem.send(n_uuid, ports["mnp_reg"], "netdisconnect", np, ser.serialize({ mnp.networkName }))
@@ -477,8 +540,8 @@ function mnp.pass(mtype, np, data)
 	if mnp.tunnelConnected then
 		if np["route"][np["c"]]==mnp.tunnelIP then
 			component.tunnel.send(mtype, ser.serialize(np), ser.serialize(data))
+			return true
 		end
-		return true
 	end
 	local to = ip.findUUID(np["route"][np["c"]])
 	if not to then
