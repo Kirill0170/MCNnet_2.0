@@ -1,16 +1,8 @@
 W: Package manager: package servers send updates to listserv
-/etc/apm/sources.list
-MNP update
--passwords for networks
--c2cping domain support
--move mnp files to /etc/mnp/
--better domains
--cm setdomain
--node debug
--node check if connected
-:34cd local ipv2
-MNP: network-wide admin operations:
-  get_network
+all-purpose bans (?)
+dns client unattach
+FTP list
+cmtui
 --future--
 UAP: security protocol for mcnnet
 some kind of rsh-like software

@@ -1,6 +1,6 @@
 --MNP CONNECTION MANAGER for client
-local ver="ALPHA 0.9.7"
-local filename="/usr/.cm_last_netname"
+local ver="ALPHA 0.9.14"
+local filename="/etc/.cm_last_netuuid"
 local mnp=require("cmnp")
 local ip=require("ipv2")
 local term=require("term")
@@ -9,6 +9,7 @@ local component=require("component")
 local gpu=component.gpu
 
 local function cprint(text,color)
+  if not color then print(text) end
   gpu.setForeground(color)
   print(text)
   gpu.setForeground(0xFFFFFF)
@@ -21,18 +22,20 @@ local function help()
   cprint("Usage: cm [action] <options>",0x6699FF)
   cprint("Actions:",0x33CC33)
   local help_cmds=[[
-ver                   version info
-help                  show this message
-netsearch (ns)        search for networks
-connect <name>        connect to network by name;
-                          should have connected to this network previously
-                          use 'cm connect' to connect to previous network
-status (s)            current connection status
-disconnect (d)        disconnect from network
-reconnect  (rc)       disconnect & connect
-nping <n> <t>        ping node
-c2cping <n> <t> [ip] Client-to-Client pinging
-reset                reset all saved MNP data
+ver                    version info
+help                   show this message
+netsearch (ns)         search for networks
+connect <name>         connect to network by name;
+                           should have connected to this network previously
+                           use 'cm connect' to connect to previous network
+status (s)             current connection status
+disconnect (d)         disconnect from network
+reconnect  (rc)        disconnect & connect
+setdomain  (sd)        set domain
+removedomain (rd)      remove your domain
+nping (np)<n> <t>      ping node
+c2cping (ping) [dest]  Client-to-Client pinging
+reset                  reset all saved MNP data
   ]]
   print(help_cmds)
   cprint("Options:",0x33CC33)
@@ -40,6 +43,7 @@ reset                reset all saved MNP data
   print("-p             Print logs")
   print("--t=<int>      Timeout time(for ping)")
   print("--n=<int>      Number of iterations(for ping & search)")
+  print("--static       For static IPv2 assignment")
 end
 local function versions()
   cprint("MNP Client Connection Manager",0xFFCC33)
@@ -47,12 +51,12 @@ local function versions()
   mnp.logVersions()
 end
 
-local function savePrevName(name)
+local function savePrevAddress(name)
   local file=io.open(filename,"w")
   file:write(name)
   file:close()
 end
-local function loadPrevName()
+local function loadPrevAddress()
   local file=io.open(filename,"r")
   if not file then return nil end
   local name=file:read("*a")
@@ -66,9 +70,13 @@ local function status()
     return false
   end
   print("This computer's IP is: "..this_ip)
+  local n,c=ip.getParts(this_ip)
+  if c~=string.sub(require("component").modem.address,1,4) then
+    print("Dynamic IPv2 enabled!")
+  end
   if mnp.isConnected(true) then
     cprint("Connected!",0x33CC33)
-    cprint("Network name: "..loadPrevName(),0x33CC33)
+    cprint("Network name: "..mnp.getSavedNodeName(loadPrevAddress()),0x33CC33)
   else
     cprint("Not connected.",0xFF0000)
   end
@@ -87,20 +95,22 @@ local function printDist(str1,str2)
 end
 
 
-local function search(s,p)
+local function netsearch(force_static)
   print("Searching for networks...")
-  local rsi=mnp.networkSearch(5,true) --res[netname]={from,dist}
+  local rsi=mnp.networkSearch(5,true) --res[node ip]={name,from,dist,requirePassword}
   if not next(rsi) then cprint("No networks found",0xFFCC33)
   else
-    print("№ | Network name | distance")
+    print("№ |   IPv2    | Network name | distance")
+    print("--+-----------+--------------+---------")
     local counter=1
-    local choice={} --choice[num]={{from,dist},netname}
-    for name, info in pairs(rsi) do
-      printDist(tostring(counter).." | "..name,info[2])
-      choice[counter]={rsi[name],name}
+    local choice={} --choice[num]={{name,from,dist,requirePassword},netname,node_ip}
+    for node_ip, info in pairs(rsi) do
+      local name=info[1]
+      printDist(tostring(counter).." | "..node_ip.." | "..name,info[3])
+      choice[counter]={rsi[node_ip],name,node_ip}
       counter=counter+1
     end
-    print("------------------------------")
+    print("--+-----------+--------------+---------")
     print("Select network to connect or 'q' to exit")
     local exit=false
     local selected=0
@@ -113,36 +123,63 @@ local function search(s,p)
           selected=tonumber(input)
           exit=true
         else
-          cprint("Invalid choice.",0xFF0000)
+          cprint("Unknown choice.",0xFF0000)
         end
       else
-        cprint("Unknown choice. 'q' to exit.",0xFF0000)
+        cprint("Invalid choice. 'q' to exit.",0xFF0000)
       end
     end
     --connect
     print("Trying to connect to "..choice[selected][2])
-    savePrevName(choice[selected][2])
-    mnp.networkConnectByName(choice[selected][1][1],choice[selected][2],1)
+    savePrevAddress(choice[selected][1][2])
+    if choice[selected][1][4] then
+      term.write("Enter network password: ")
+      local new_password=term.read({},false,{},"*")
+      term.write("\n")
+      new_password=string.sub(new_password,1,#new_password-1)
+      if mnp.networkConnectByName(choice[selected][1][2],choice[selected][2],new_password) then
+        cprint("Connected successfully",0x33cc33)
+        mnp.addNodePassword(choice[selected][3],new_password)
+      else
+        cprint("Incorrect password!",0xFF0000)
+      end
+    else
+      mnp.networkConnectByName(choice[selected][1][2],choice[selected][2],"")
+    end
   end
 end
 
-local function connect(name)
-  mnp.openPorts()
-  if not name then--check previous name
-    name=loadPrevName()
-    if not name then
-      cprint("You haven't connected before. Use 'cm netsearch' to search for networks",0xFFCC33)
-      return false
-    end
+local function connect(name,force_static)
+  if force_static==nil then
+    force_static=false
   end
-  local address=mnp.getSavedNode(name)
-  if not address then
+  mnp.openPorts()
+  local address,password,node_ip
+  if not name then--check previous name
+    address=loadPrevAddress()
+    name,password,node_ip=mnp.getSavedNodeName(address)
+  else
+    address,password,node_ip=mnp.getSavedNode(name)
+  end
+  if not name then
     cprint("Saved node addresses not found. Use 'cm netsearch' to search for networks",0xFFCC33)
     return false end
   if mnp.isConnected() then mnp.disconnect() end
-  print("Trying to connect to "..name)
-  savePrevName(name)
-  if mnp.networkConnectByName(address,name) then print("Connected successfully")
+  print("Trying to connect to "..name.." ("..node_ip..")")
+  savePrevAddress(address)
+  local check,password_required=mnp.networkConnectByName(address,name,password,not force_static)
+  if check then cprint("Connected successfully",0x33cc33)
+  elseif password_required then
+    term.write("Enter network password: ")
+    local new_password=term.read({},false,{},"*")
+    new_password=string.sub(new_password,1,#new_password-1)
+    term.write("\n")
+    if mnp.networkConnectByName(address,name,new_password,not force_static) then
+      cprint("Connected successfully",0x33cc33)
+      mnp.addNodePassword(node_ip,new_password)
+    else
+      cprint("Incorrect password!",0xFF0000)
+    end
   else print("Couldn't connect") end
 end
 
@@ -191,20 +228,16 @@ local function pingNode(n,t)
     print("     max: "..max.."s min: "..min.."s avg: "..avg.."s")
   end
 end
-local function c2cping(n,t,to_ip)
+local function c2cping(n,t,dest)
   if not mnp.isConnected() then
     cprint("Not connected.",0xFF0000)
     return false
   end
-  if not ip.isIPv2(to_ip) then cprint("IPv2 needed to ping!",0xFF0000) return false end
-  if not mnp.getSavedRoute(to_ip) then
-    cprint("No route to "..to_ip.." found. searching...",0xFFCC33)
-    if not mnp.search(to_ip) then
-      cprint("Failed search",0xFFCC33)
-      return false
-    end
+  local check,to_ip=mnp.checkAvailability(dest)
+  if not check then
+    cprint("Couldn't find host!",0xFF0000)
+    return false
   end
-  if not mnp.getSavedRoute(to_ip) then cprint("Couldn't get route for "..to_ip,2) return false end
   print("Client-to-Client pinging "..to_ip)
   if n==1 then
     local time=mnp.mncp.c2cPing(to_ip,tonumber(t))
@@ -229,10 +262,34 @@ local function reset()
   if chk=="y" or chk=="Y" then
     print("Resetting!")
     disconnect()
-    os.remove("/etc/mnpSavedNetworks.st")
-    os.remove("/etc/mnpSavedRoutes.st")
-    os.remove("/etc/mnpSavedDomains.st")
+    os.remove("/etc/mnp/SavedNetworks.st")
+    os.remove("/etc/mnp/SavedRoutes.st")
+    os.remove("/etc/mnp/SavedDomains.st")
   end
+end
+local function setdomain(name)
+  if name then
+    if not mnp.checkHostname(name) then
+      cprint("Invalid domain! Should look like this: example.com",0xFF0000)
+      return false
+    end
+    if mnp.setDomain(name) then
+      cprint("Successfully set domain to "..name,0x33cc33)
+      return true
+    end
+  end
+  cprint("Couldn't set domain",0xff0000)
+end
+local function removedomain()
+  if mnp.removeDomain() then
+    cprint("Removed domain successfully",0x33cc33)
+  else
+    cprint("Domain was not set.",0xFF0000)
+  end
+end
+local function debugC2C()
+  mnp.toggleLog(true)
+  mnp.mncp.c2cPingService(true)
 end
 --main
 local args,ops = shell.parse(...)
@@ -251,13 +308,18 @@ if ops["n"] then
   ops["n"]=tonumber(ops["n"])
 else ops["n"]=10 end
 
+mnp.openPorts()
+
 if args[1]=="disconnect" or args[1]=="d" then disconnect()
 elseif args[1]=="status" or args[1]=="s" then status()
-elseif args[1]=="netsearch" or args[1]=="ns" then search(ops["s"],ops["p"])
+elseif args[1]=="netsearch" or args[1]=="ns" then netsearch(ops["static"])
 elseif args[1]=="nping" or args[1]=="np" then pingNode(ops["n"],ops["t"])
-elseif args[1]=="c2cping" then c2cping(ops["n"],ops["t"],args[2])
-elseif args[1]=="connect" or args[1]=="c" then connect(args[2])
+elseif args[1]=="c2cping" or args[1]=="ping" then c2cping(ops["n"],ops["t"],args[2])
+elseif args[1]=="connect" or args[1]=="c" then connect(args[2],ops["static"])
 elseif args[1]=="reconnect" or args[1]=="rc" then reconnect()
+elseif args[1]=="setdomain" or args[1]=="sd" then setdomain(args[2])
+elseif args[1]=="removedomain" or args[1]=="rd" then removedomain()
+elseif args[1]=="debug" then debugC2C()
 elseif args[1]=="reset" then reset()
 elseif args[1]=="help" then help()
 elseif args[1]=="ver" then versions()

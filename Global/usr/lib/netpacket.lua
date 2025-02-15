@@ -1,6 +1,6 @@
 local ip=require("ipv2")
 local computer=require("computer")
-local version="2.0 BETA"
+local version="2.1"
 local netpacket={}
 local dolog=true
 function log(text)
@@ -23,20 +23,20 @@ function netpacket.checkPacket(netpacketInfo) --log for debug
 	if not netpacketInfo["route"] then log("no route table") return false end
 	if not netpacket.checkRoute(netpacketInfo["route"]) then log("incorrect route") return false end
 	if not tonumber(netpacketInfo["ttl"]) then log("no ttl") return false end
-	if not ip.isIPv2(netpacketInfo["t"]) and netpacketInfo["t"]~="broadcast" and netpacketInfo["t"]~="dns_lookup" then 
+	if not ip.isIPv2(netpacketInfo["t"]) and netpacketInfo["t"]~="broadcast" and netpacketInfo["t"]~="dns_lookup" then
 		if netpacketInfo["t"] then log("invalid destination: "..netpacketInfo["t"]) else log("no destination") end
-		return false 
+		return false
 	end
 	if not netpacketInfo["c"] then return false end
 	return true
 end
 function netpacket.newPacket(to_ip,route,ttl)
-	from_ip=""
+	local from_ip=""
 	if ip.isIPv2(os.getenv("this_ip")) then --try to use default
 		from_ip=os.getenv("this_ip")
 	else return nil end
-	if to_ip=="dns_lookup" then --pass
-	elseif not ip.isIPv2(to_ip) or not to_ip then to_ip="broadcast" end
+	local check,to_ip=ip.isIPv2(to_ip)
+	if not check then to_ip="broadcast" end
 	if not tonumber(ttl) then ttl=16 end
 	local newnetpacket={}
 	newnetpacket["uuid"]=require("uuid").next()

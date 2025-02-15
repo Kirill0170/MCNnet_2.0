@@ -1,23 +1,22 @@
 --Mcn-net Networking Protocol for Client BETA
 --Modem is required.
 local dolog=false
-local networkSaveFileName="/etc/mnpSavedNetworks.st"-- array[netname]=<uuid-address>
-local routeSaveFileName="/etc/mnpSavedRoutes.st" --array[to_ip]=<route>
-local domainSaveFileName="/etc/mnpSavedDomains.st" --array[domain]={<ip>,<route>}
+local experimental=true
+local networkSaveFileName="/etc/mnp/SavedNetworks.st"-- array[<ipv2]>]={<netname>,<uuid-address>,<password>}
+local routeSaveFileName="/etc/mnp/SavedRoutes.st" --array[<this_ip>][<ipv2>]=<route>
+local domainSaveFileName="/etc/mnp/SavedDomains.st" --array[<domain>]={<ipv2>,<route>}
 local component=require("component")
 local computer=require("computer")
 local ser=require("serialization")
 local netpacket = require("netpacket")
 local modem=component.modem
+local fs=require("filesystem")
 local thread=require("thread")
 local event=require("event")
 local ip=require("ipv2")
 local gpu=component.gpu
-local mnp_ver="2.5.3 BETA"
-local mncp_ver="2.4.2 INDEV"
-local forbidden_vers={}
-forbidden_vers["mnp"]={"2.21 EXPERIMENTAL"}
-forbidden_vers["mncp"]={"2.1 EXPERIMENTAL"}
+local mnp_ver="2.7.3"
+local mncp_ver="2.5"
 local ports={}
 ports["mnp_reg"]=1000
 ports["mnp_srch"]=1001
@@ -25,13 +24,9 @@ ports["mnp_data"]=1002
 ports["mncp_srvc"]=1003
 ports["mncp_err"]=1004
 ports["mncp_ping"]=1005
-ports["mftp_conn"]=1006
-ports["mftp_data"]=1007
-ports["mftp_srvc"]=1008
-ports["dns_lookup"]=1009
 local mnp={}
 mnp.mncp={}
-function mnp.log(mod,text, crit)
+function mnp.log(mod,text,crit)
 	if not mod then mod="MNP" end
 	if not text then text="Unknown" end
 	local res = "[" .. computer.uptime() .. "]"
@@ -58,7 +53,10 @@ function mnp.log(mod,text, crit)
 	end
 end
 --init-----------------------------------
-function mnp.logVersions() 
+if not fs.exists('/etc/mnp') then
+  fs.makeDirectory('/etc/mnp')
+end
+function mnp.logVersions()
 	mnp.log("MNP","MNP version " .. mnp_ver)
 	mnp.log("MNP","MNCP version " .. mncp_ver)
 	mnp.log("MNP","NP version " .. netpacket.ver())
@@ -158,10 +156,15 @@ function mnp.openPorts(plog)
   return true
 end
 function mnp.toggleLog(change)
-  if type(change)=="boolean" then 
+  if type(change)=="boolean" then
     dolog=change
     return true
   else return false end
+end
+function mnp.checkHostname(name)
+  if not name then return false end
+  local pattern = "^%w+%.%w+$"
+  return string.match(name, pattern) ~= nil
 end
 ----------Saving Node Addresses------------
 function mnp.setNetworkSaveFileName(newName) networkSaveFileName=newName end
@@ -169,6 +172,9 @@ function mnp.loadSavedNodes()
   local file=io.open(networkSaveFileName,"r")
   if not file then --initialize file
     file=io.open(networkSaveFileName,"w")
+    if not file then
+      error("Can't open file to write: "..networkSaveFileName)
+    end
     file:write(ser.serialize({}))
     file:close()
     return {}
@@ -178,31 +184,57 @@ function mnp.loadSavedNodes()
   local savedata2={}
   --checks
   if type(savedata)~="table" then return {} end
-  for netname,n_uuid in pairs(savedata) do
-    if ip.isUUID(n_uuid) then
-      savedata2[netname]=n_uuid
+  for n_ip,n_data in pairs(savedata) do
+    if ip.isUUID(n_data[2]) then
+      savedata2[n_ip]=n_data
     end
   end
   return savedata2
 end
-function mnp.saveNodes(table)
+function mnp.getSavedNode(networkName)--make for uuid?
+  local table=mnp.loadSavedNodes()
+  for n_ip,n_info in pairs(table) do
+    if n_info[1]==networkName then return n_info[2],n_info[3],n_ip end
+  end
+  return nil
+end
+function mnp.getSavedNodeName(g_uuid)
+  local table=mnp.loadSavedNodes()
+  for n_ip,n_info in pairs(table) do
+    if n_info[2]==g_uuid then return n_info[1],n_info[3],n_ip end
+  end
+  return nil
+end
+function mnp.saveNodes(table,force)
   if type(table)~="table" then return false end
+  if not force then
+    local old_nodes=mnp.loadSavedNodes()
+    for n_ip,n_data in pairs(table) do
+      if old_nodes[n_ip]~=nil then
+        local password=n_data[3]
+        if not password then password=old_nodes[n_ip][3] end
+        table[n_ip][3]=password
+      end
+    end
+  end
   local file=io.open(networkSaveFileName, "w")
+  if not file then
+    error("Can't open file to write: "..networkSaveFileName)
+  end
   file:write(ser.serialize(table))
   file:close()
   return true
 end
-function mnp.getSavedNode(networkName)
+function mnp.addNodePassword(node_ip,password)
   local table=mnp.loadSavedNodes()
-  for netname,from in pairs(table) do
-    if netname==networkName then return from end 
+  for n_ip,n_data in pairs(table) do
+    if n_ip==node_ip then
+      table[n_ip][3]=password
+      mnp.saveNodes(table)
+      return true
+    end
   end
-  return nil
-end
-function mnp.checkHostname(name) --imported from dns.lua
-  if not name then return false end
-  local pattern = "^%w+%.%w+$"
-  return string.match(name, pattern) ~= nil
+  return false
 end
 -----------Saving searched routes------------
 function mnp.setRouteSaveFileName(newName) routeSaveFileName=newName end
@@ -210,6 +242,9 @@ function mnp.loadRoutes()
   local file=io.open(routeSaveFileName,"r")
   if not file then --initialize file
     file=io.open(routeSaveFileName,"w")
+    if not file then
+      error("Can't open file to write: "..routeSaveFileName)
+    end
     file:write(ser.serialize({}))
     file:close()
     return {}
@@ -220,72 +255,66 @@ function mnp.loadRoutes()
   --checks
   if type(savedata)~="table" then
     file=io.open(routeSaveFileName,"w")
+    if not file then
+      error("Can't open file to write: "..routeSaveFileName)
+    end
     file:write(ser.serialize({}))
     file:close()
     return {}
   end
-  for s_ip,route in pairs(savedata) do
-    if ip.isIPv2(s_ip) and netpacket.checkRoute(route) then
-      savedata2[s_ip]=route
-    end
+  -- for s_ip,route in pairs(savedata) do
+  --   if ip.isIPv2(s_ip) and netpacket.checkRoute(route) then
+  --     savedata2[s_ip]=route
+  --   end
+  -- end
+  return savedata --dunno how to fix this.
+end
+function mnp.saveRoutes(table)
+  if type(table)~="table" then return false end
+  local file=io.open(routeSaveFileName,"w")
+  if not file then
+    error("Can't open file to write: "..routeSaveFileName)
   end
-  return savedata2
+  file:write(ser.serialize(table))
+  file:close()
+  return true
 end
 function mnp.getSavedRoute(to_ip)
-  if not ip.isIPv2(to_ip) then return nil end
+  local check,to_ip=ip.isIPv2(to_ip)
+  if not check then return nil end
   local saved=mnp.loadRoutes()
   if saved=={} then return nil end
-  return saved[to_ip]
+  local this_ip="unknown"
+  if mnp.isConnected() then this_ip=os.getenv("this_ip") end
+  if not saved[this_ip] then saved[this_ip]={} end
+  local route=saved[this_ip][to_ip]
+  if not route and experimental and mnp.isConnected() then --experimental transform
+    mnp.log("MNP","Searching other routes for translatable..")
+    local node_ip=string.sub(this_ip,1,4)..":0000"
+    for saved_this_ip,dest_ips in pairs(saved) do
+      for dest_ip,dest_route in pairs(dest_ips) do
+        if dest_ip==to_ip and dest_route[1]==node_ip then
+          --client is connected to the same node, we can transform
+          mnp.log("MNP","Translating route!")
+          dest_route[0]=this_ip
+          mnp.saveRoute(to_ip,dest_route)
+          return dest_route
+        end
+      end
+    end
+    mnp.log("MNP","Didn't find suitable routes")
+  end
+  return route
 end
 function mnp.saveRoute(to_ip,route)
-  if not netpacket.checkRoute(route) or not ip.isIPv2(to_ip) then return false end
+  local check,to_ip=ip.isIPv2(to_ip)
+  if not netpacket.checkRoute(route) or not check then return false end
   local saved=mnp.loadRoutes()
-  saved[to_ip]=route
-  local file=io.open(routeSaveFileName,"w")
-  file:write(ser.serialize(saved))
-  file:close()
-  return true
-end
------------Saving searched domians-----------
-function mnp.loadDomains()
-  local file=io.open(domainSaveFileName,"r")
-  if not file then --initialize file
-    file=io.open(domainSaveFileName,"w")
-    file:write(ser.serialize({}))
-    file:close()
-    return {}
-  end
-  local savedata=ser.unserialize(file:read("*a"))
-  file:close()
-  local savedata2={}
-  --checks
-  if type(savedata)~="table" then 
-    file=io.open(domainSaveFileName,"w")
-    file:write(ser.serialize({}))
-    file:close()
-    return {}
-  end
-  for domain,data in pairs(savedata) do
-    if mnp.checkHostname(domain) and ip.isIPv2(data[1]) and netpacket.checkRoute(data[2]) then
-      savedata2[domain]=data
-    end
-  end
-  return savedata2
-end
-function mnp.saveDomain(domain,to_ip,route)
-  if not mnp.checkHostname(domain) or not netpacket.checkRoute(route) or not ip.isIPv2(to_ip) then return false end
-  local saved=mnp.loadDomains()
-  saved[domain]={to_ip,route}
-  local file=io.open(domainSaveFileName,"w")
-  file:write(ser.serialize(saved))
-  file:close()
-  return true
-end
-function mnp.getFromDomain(domain)
-  if not mnp.checkHostname(domain) then return nil end
-  local saved=mnp.loadDomains()
-  if saved=={} then return nil end
-  return saved[domain]
+  local this_ip="unknown"
+  if mnp.isConnected() then this_ip=os.getenv("this_ip") end
+  if not saved[this_ip] then saved[this_ip]={} end
+  saved[this_ip][to_ip]=route
+  mnp.saveRoutes(saved)
 end
 -----------Main-----------------
 function mnp.networkSearch(searchTime,save)
@@ -302,45 +331,49 @@ function mnp.networkSearch(searchTime,save)
   if not modem.isOpen(ports["mnp_reg"]) then modem.open(ports["mnp_reg"]) end
   thread.create(timer,searchTime,timerName):detach()
   while true do
-    modem.broadcast(ports["mnp_reg"],"netsearch",ser.serialize(netpacket.newPacket()),ser.serialize({res}))
+    modem.broadcast(ports["mnp_reg"],"netsearch",ser.serialize(netpacket.newPacket()),ser.serialize(res))
     local id,name,from,port,dist,mtype,np,data=event.pullMultiple("modem","timeout","interrupted")
     if id=="interrupted" then break
     elseif id=="timeout" and name==timerName then break
     else
       if port==ports["mnp_reg"] then
-        if not netpacket.checkPacket(ser.unserialize(np)) then mnp.log("MNP","Invalid packet on netsearch")
+        np=ser.unserialize(np)
+        if not netpacket.checkPacket(np) then mnp.log("MNP","Invalid packet on netsearch")
         else
           data=ser.unserialize(data)
           if data[1]~=nil then --netname found
-            res[data[1]]={from,dist}
-            if save then saveTable[data[1]]=from end
+            res[np["route"][0]]={data[1],from,dist,data[2]}
+            if save then saveTable[np["route"][0]]={data[1],from} end
           end
         end
       end
     end
   end
   if save then mnp.saveNodes(saveTable) end
-  return res --table[netname]={<uuid>,dist}
+  return res --table[node ip]={name,uuid,dist,requirePassword}
 end
 
-function mnp.networkConnectByName(from,name)
+function mnp.networkConnectByName(to_uuid,name,password,force_dynamic)
   if not name then return false end
+  if not password then password="" end
+  if type(force_dynamic)~="boolean" then force_dynamic=true end
   os.setenv("this_ip","0000:0000")
   os.setenv("node_uuid",nil)
   local rnp=netpacket.newPacket(os.getenv("this_ip"))--!!
-  local sdata={name}
-  modem.send(from,ports["mnp_reg"],"netconnect",ser.serialize(rnp),ser.serialize(sdata))
+  local sdata={name,password,force_dynamic}
+  if force_dynamic then mnp.log("MNP","Dynamic!")  end
+  modem.send(to_uuid,ports["mnp_reg"],"netconnect",ser.serialize(rnp),ser.serialize(sdata))
   while true do
     local _,this,rfrom,port,_,mtype,np,data=event.pull(5,"modem")
     if not rfrom then
       mnp.log("MNP","Node timeouted")
       return false
-    elseif port~=ports["mnp_reg"] or rfrom~=from then
+    elseif port~=ports["mnp_reg"] or rfrom~=to_uuid then
     else
       data=ser.unserialize(data)
-      if name==data[1] then
+      if name==data[1] and mtype=="netconnect" then
         mnp.log("MNP","Connected to "..name)
-        if not ip.isIPv2(data[2]) then 
+        if not ip.isIPv2(data[2]) then
           mnp.log("MNP","incorrect IP received: aborted")
           return false
         end
@@ -349,9 +382,12 @@ function mnp.networkConnectByName(from,name)
           return false
         else
           mnp.log("MNP","IP is set")
-          os.setenv("node_uuid",from)
+          os.setenv("node_uuid",to_uuid)
           return true
         end
+      elseif mtype=="netforbidden" then
+        mnp.log("MNP","Password incorrect!",1)
+        return false,true
       else
         mnp.log("MNP","Unexpected network name received")
         return false
@@ -363,8 +399,62 @@ function mnp.setDomain(domain)
   if not mnp.checkHostname(domain) then return false end
   if not mnp.isConnected() then return false end
   modem.send(os.getenv("node_uuid"),ports["mnp_reg"],"setdomain",ser.serialize(netpacket.newPacket()),ser.serialize({domain}))
-  os.setenv("this_domain",domain)
-  return true
+  local timerName="sd"..computer.uptime()
+  thread.create(timer,5,timerName):detach()
+  while true do
+    local id,name,from,port,_,rmtype,np,data=event.pullMultiple("modem","timeout")
+    if id=="timeout" and name==timerName then
+      mnp.log("MNP","Node timeouted..?",2)
+      return false
+    elseif id=="modem_message" then
+      if not np then return nil end
+      np=ser.unserialize(np)
+      if netpacket.checkPacket(np) and from==os.getenv("node_uuid") and port==ports["mnp_reg"] and rmtype=="setdomain" then
+        data=tostring(data)
+        if data=="ok" then
+          mnp.log("MNP","Successfully set domain")
+          os.setenv("this_domain",domain)
+          return true
+        elseif data=="exists" then
+          mnp.log("MNP","This domain already exists!",1)
+          return false
+        elseif data=="forbidden" then
+          mnp.log("MNP","This domain is forbidden!",2)
+          return false
+        else
+          mnp.log("MNP","Unknown dns response: "..data)
+          return false
+        end
+      end
+    end
+  end
+end
+function mnp.removeDomain()
+  if mnp.checkHostname(os.getenv("this_domain")) then
+    modem.send(os.getenv("node_uuid"),ports["mnp_reg"],"removedomain",ser.serialize(netpacket.newPacket()))
+    return true
+  end
+  return false
+end
+function mnp.getDomainIP(domain)
+  if not mnp.isConnected() then return false end
+  modem.send(os.getenv("node_uuid"),ports["mnp_srch"],"getdomain",ser.serialize(netpacket.newPacket()),ser.serialize({domain}))
+  local timerName="gd"..computer.uptime()
+  thread.create(timer,5,timerName):detach()
+  while true do
+    local id,name,from,port,_,rmtype,np,data=event.pullMultiple("modem","timeout")
+    if id=="timeout" and name==timerName then
+      break
+    elseif id=="modem_message" then
+      if not np then return nil end
+      np=ser.unserialize(np)
+      if netpacket.checkPacket(np) and from==os.getenv("node_uuid") and port==ports["mnp_srch"] and rmtype=="getdomain" then
+        data=ser.unserialize(data)
+        if ip.isIPv2(data[1]) then return data[1] end
+      end
+    end
+  end
+  return nil
 end
 function mnp.disconnect()
    modem.send(os.getenv("node_uuid"),ports["mnp_reg"],"netdisconnect",ser.serialize(netpacket.newPacket()))
@@ -384,42 +474,38 @@ function mnp.isConnected(ping)
   return false
 end
 function mnp.checkAvailability(dest)
-  local domain=""
+  local to_ip,check
   if mnp.checkHostname(dest) then
-    domain=dest
-    if not mnp.getFromDomain(domain) then
-      mnp.log("MNP","No route to "..domain.." found. searching...",1)
-      if not mnp.search("",60,domain) then
-        mnp.log("MNP","Failed search",1)
-        return false
-      end
-    end
-    dest=mnp.getFromDomain(domain)[1]
-  elseif not mnp.getSavedRoute(dest) then
-    mnp.log("MNP","No route to "..dest.." found. searching...",1)
-    if not mnp.search(dest) then
+    dest=mnp.getDomainIP(dest) or ""
+  end
+  check,to_ip=ip.isIPv2(dest)
+  if not check then return false end
+  if not mnp.getSavedRoute(to_ip) then
+    mnp.log("MNP","No route to "..to_ip.." found. searching...",1)
+    if not mnp.search(to_ip) then
       mnp.log("MNP","Failed search",1)
       return false
     end
   end
-  if not mnp.getSavedRoute(dest) then mnp.log("MNP","Couldn't get route for "..dest,2) return false,nil end
-  return true,dest
+  if not mnp.getSavedRoute(to_ip) then mnp.log("MNP","Couldn't get route for "..to_ip,2) return false,nil end
+  return true,to_ip
 end
 function mnp.search(to_ip,searchTime,domain)
   if not mnp.isConnected() then return false end
   if ip.isIPv2(to_ip)==false and to_ip~="" and to_ip~="broadcast" then return false end
   if not searchTime then searchTime=120 end
   local timerName="mnpsrch"..computer.uptime()
-  local np=netpacket.newPacket(to_ip)
-  local dns=false
   if mnp.checkHostname(domain) then
-    dns=true
-    netpacket.newPacket("broadcast")
+    to_ip=mnp.getDomainIP(domain)
+    if not ip.isIPv2(to_ip) then
+      mnp.log("MNP","Coudn't get IPv2 from domain!")
+      return false
+    end
   end
+  local np=netpacket.newPacket(to_ip)
   mnp.openPorts()
   mnp.log("MNP","Started search for "..to_ip)
-  if not dns then modem.send(os.getenv("node_uuid"),ports["mnp_srch"],"search",ser.serialize(np))
-  else modem.send(os.getenv("node_uuid"),ports["mnp_srch"],"search",ser.serialize(np),ser.serialize({domain})) end
+  modem.send(os.getenv("node_uuid"),ports["mnp_srch"],"search",ser.serialize(np))
   thread.create(timer,searchTime,timerName):detach()
   while true do
     local id,name,from,port,_,mtype,rnp,data=event.pullMultiple(1,"modem","interrupted","timeout")
@@ -436,15 +522,6 @@ function mnp.search(to_ip,searchTime,domain)
         if rnp["f"]==true and rnp["route"][#rnp["route"]]==to_ip then
           mnp.saveRoute(to_ip,rnp["route"])
           return true
-        elseif dns then
-          data=ser.unserialize(data)
-          if data[1]==domain then
-            if ip.isIPv2(data[2]) then
-              mnp.saveRoute(data[2],rnp["route"])
-            end
-            mnp.saveDomain(domain,data[2],rnp["route"])
-            return true
-          end
         else --error
           if rnp["route"][#rnp["route"]]~="to_ip" then --traceback
             mnp.log("MNP","Search failed: incorrect final ip",1)
@@ -498,7 +575,7 @@ function mnp.receive(from_ip,mtype,timeoutTime,rememberRoute)--REVIEW
       break
     elseif id=="modem_message" then
       if not np then return nil end
-    np=ser.unserialize(np)
+      np=ser.unserialize(np)
       if netpacket.checkPacket(np) and from==os.getenv("node_uuid") and port==ports["mnp_data"] and rmtype==mtype then
         if np["t"]==from_ip or np["route"][0]==from_ip or from_ip=="broadcast" then
           if rememberRoute then
