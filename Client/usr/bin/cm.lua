@@ -268,6 +268,10 @@ local function reset()
 end
 local function setdomain(name)
   if name then
+    if not mnp.checkHostname(name) then
+      cprint("Invalid domain! Should look like this: example.com",0xFF0000)
+      return false
+    end
     if mnp.setDomain(name) then
       cprint("Successfully set domain to "..name,0x33cc33)
       return true
