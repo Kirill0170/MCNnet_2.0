@@ -4,6 +4,9 @@ Advanced node networking for Open Computers, still under active development.
 
 ## Currently written:
 * Low-level commpunication between nodes & clients(searching & sending packets)
+* Tunnel Nodes for cross-dimentional communication
+* NADM for node administration!
+* Network passwords!
 * Protocols: MNP, MNCP(pinging), SSAP
 * SSAP servers are working for use
 * FTP protocol for transmitting files
@@ -14,7 +17,6 @@ Advanced node networking for Open Computers, still under active development.
 * Web Browser 0.9
 * APM package manager!
 ## Planned:
-* Tunnel Nodes for cross-dimentional communication
 * UAP for logins
 * WDP backend support
 
