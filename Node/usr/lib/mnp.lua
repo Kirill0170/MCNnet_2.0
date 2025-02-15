@@ -13,7 +13,7 @@ local modem = component.modem
 local event = require("event")
 local ip = require("ipv2")
 local gpu = component.gpu
-local mnp_ver = "2.7.2"
+local mnp_ver = "2.7.3"
 local mncp_ver = "2.4"
 local ports = {}
 ports["mnp_reg"] = 1000
@@ -199,8 +199,9 @@ function mnp.addDomain(data)
 end
 function mnp.removeDomain(data)
 	if ip.isIPv2(data[1]) then
+		local t=mnp.domains[data[1]]
 		mnp.domains[data[1]]=nil
-		return true
+		return true,t
 	end
 	return false
 end

@@ -128,6 +128,9 @@ local function packetHandle(thread_id,from,mtype,np,data)
     end
   elseif mtype=="setdomain" then
     mnp.setDomain(from,np,data)
+  elseif mtype=="removedomain" then
+    local success,d=mnp.removeDomain(np["route"][0])
+    if success then mnp.networkSend("deldomain",d) end
   elseif mtype=="getdomain" then
     mnp.returnDomain(from,data)
   else --data

@@ -1,5 +1,5 @@
 --MNP CONNECTION MANAGER for client
-local ver="ALPHA 0.9.13.3"
+local ver="ALPHA 0.9.14"
 local filename="/etc/.cm_last_netuuid"
 local mnp=require("cmnp")
 local ip=require("ipv2")
@@ -32,6 +32,7 @@ status (s)             current connection status
 disconnect (d)         disconnect from network
 reconnect  (rc)        disconnect & connect
 setdomain  (sd)        set domain
+removedomain (rd)      remove your domain
 nping (np)<n> <t>      ping node
 c2cping (ping) [dest]  Client-to-Client pinging
 reset                  reset all saved MNP data
@@ -279,6 +280,13 @@ local function setdomain(name)
   end
   cprint("Couldn't set domain",0xff0000)
 end
+local function removedomain()
+  if mnp.removeDomain() then
+    cprint("Removed domain successfully",0x33cc33)
+  else
+    cprint("Domain was not set.",0xFF0000)
+  end
+end
 local function debugC2C()
   mnp.toggleLog(true)
   mnp.mncp.c2cPingService(true)
@@ -310,6 +318,7 @@ elseif args[1]=="c2cping" or args[1]=="ping" then c2cping(ops["n"],ops["t"],args
 elseif args[1]=="connect" or args[1]=="c" then connect(args[2],ops["static"])
 elseif args[1]=="reconnect" or args[1]=="rc" then reconnect()
 elseif args[1]=="setdomain" or args[1]=="sd" then setdomain(args[2])
+elseif args[1]=="removedomain" or args[1]=="rd" then removedomain()
 elseif args[1]=="debug" then debugC2C()
 elseif args[1]=="reset" then reset()
 elseif args[1]=="help" then help()

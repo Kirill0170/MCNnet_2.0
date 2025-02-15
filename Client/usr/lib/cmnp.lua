@@ -15,7 +15,7 @@ local thread=require("thread")
 local event=require("event")
 local ip=require("ipv2")
 local gpu=component.gpu
-local mnp_ver="2.7.2"
+local mnp_ver="2.7.3"
 local mncp_ver="2.5"
 local ports={}
 ports["mnp_reg"]=1000
@@ -428,6 +428,13 @@ function mnp.setDomain(domain)
       end
     end
   end
+end
+function mnp.removeDomain()
+  if mnp.checkHostname(os.getenv("this_domain")) then
+    modem.send(os.getenv("node_uuid"),ports["mnp_reg"],"removedomain",ser.serialize(netpacket.newPacket()))
+    return true
+  end
+  return false
 end
 function mnp.getDomainIP(domain)
   if not mnp.isConnected() then return false end
