@@ -15,7 +15,7 @@ local thread=require("thread")
 local event=require("event")
 local ip=require("ipv2")
 local gpu=component.gpu
-local mnp_ver="2.6.3b"
+local mnp_ver="2.7.2"
 local mncp_ver="2.5"
 local ports={}
 ports["mnp_reg"]=1000
@@ -399,8 +399,35 @@ function mnp.setDomain(domain)
   if not mnp.checkHostname(domain) then return false end
   if not mnp.isConnected() then return false end
   modem.send(os.getenv("node_uuid"),ports["mnp_reg"],"setdomain",ser.serialize(netpacket.newPacket()),ser.serialize({domain}))
-  os.setenv("this_domain",domain)
-  return true
+  local timerName="sd"..computer.uptime()
+  thread.create(timer,5,timerName):detach()
+  while true do
+    local id,name,from,port,_,rmtype,np,data=event.pullMultiple("modem","timeout")
+    if id=="timeout" and name==timerName then
+      mnp.log("MNP","Node timeouted..?",2)
+      return false
+    elseif id=="modem_message" then
+      if not np then return nil end
+      np=ser.unserialize(np)
+      if netpacket.checkPacket(np) and from==os.getenv("node_uuid") and port==ports["mnp_reg"] and rmtype=="setdomain" then
+        data=tostring(data)
+        if data=="ok" then
+          mnp.log("MNP","Successfully set domain")
+          os.setenv("this_domain",domain)
+          return true
+        elseif data=="exists" then
+          mnp.log("MNP","This domain already exists!",1)
+          return false
+        elseif data=="forbidden" then
+          mnp.log("MNP","This domain is forbidden!",2)
+          return false
+        else
+          mnp.log("MNP","Unknown dns response: "..data)
+          return false
+        end
+      end
+    end
+  end
 end
 function mnp.getDomainIP(domain)
   if not mnp.isConnected() then return false end
