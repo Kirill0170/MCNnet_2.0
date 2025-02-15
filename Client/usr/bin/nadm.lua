@@ -1,5 +1,5 @@
 --NODE Admin client
-local ver="1.1.0"
+local ver="1.3.0"
 local mnp=require("cmnp")
 local term=require("term")
 local shell=require("shell")
@@ -28,16 +28,22 @@ local function help()
   cprint("Usage: nadm [action] [args]",0x6699FF)
   cprint("Actions: ",0x33cc33)
   print([[
-banip [ipv2]  Ban an ip from node(bans netcard UUID)
-ban [uuid]    Ban netcard UUID from network
-unban [uuid]  Unban netcard UUID from network
-list          List connected clients and domain list
+banip [ipv2]    Ban an ip from node(bans netcard UUID)
+ban [uuid]      Ban netcard UUID from network
+unban [uuid]    Unban netcard UUID from network
+list            List connected clients and domain list
+banlist         List banned domains and netcard uuids        
+bandomain       Ban domain from network 
+unbandomain     Unban domain from network
+removedomain    Remove domain from network
+removedomainip  Remove IPv2's domain from network
 ]])
   cprint("Options: ",0x33cc33)
   print("-P    Ask password")
-  print("Examples:")
+  cprint("Examples:",0x33cc33)
   print("nadm banip 12ab:34cd")
   print("nadm list")
+  print("nadm bandomain example.com")
 end
 local function getPassword(force)
   if (not node_password) or force then
@@ -66,10 +72,34 @@ local function ban(uuid)
   modem.send(os.getenv("node_uuid"),1002,"nadm",np,ser.serialize({"ban",node_password,uuid}))
   status()
 end
+local function bandomain(domain)
+  if not mnp.checkHostname(domain) then cprint("You should give a valid domain",0xFF0000) end
+  getPassword()
+  modem.send(os.getenv("node_uuid"),1002,"nadm",np,ser.serialize({"bandomain",node_password,domain}))
+  status()
+end
 local function unban(uuid)
   if not ip.isUUID(uuid) then cprint("You should give an UUID!",0xFF0000) return false end
   getPassword()
   modem.send(os.getenv("node_uuid"),1002,"nadm",np,ser.serialize({"unban",node_password,uuid}))
+  status()
+end
+local function unbandomain(domain)
+  if not mnp.checkHostname(domain) then cprint("You should give a valid domain!",0xFF0000) return false end
+  getPassword()
+  modem.send(os.getenv("node_uuid"),1002,"nadm",np,ser.serialize({"unbandomain",node_password,domain}))
+  status()
+end
+local function removedomain(domain)
+  if not mnp.checkHostname(domain) then cprint("You should give a valid domain!",0xFF0000) return false end
+  getPassword()
+  modem.send(os.getenv("node_uuid"),1002,"nadm",np,ser.serialize({"removedomain",node_password,domain}))
+  status()
+end
+local function removedomainip(g_ip)
+  if not ip.isIPv2(g_ip) then cprint("You should give a valid IPv2!",0xFF0000) return false end
+  getPassword()
+  modem.send(os.getenv("node_uuid"),1002,"nadm",np,ser.serialize({"removedomainip",node_password,g_ip}))
   status()
 end
 local function banip(n_ip)
@@ -111,6 +141,23 @@ local function list()
     print(domain.." - "..l_ip)
   end
 end
+local function banlist()
+  getPassword()
+  modem.send(os.getenv("node_uuid"),1002,"nadm",np,ser.serialize({"banlist",node_password}))
+  local rdata=mnp.receive(node_ip,"nadm",5)
+  if not rdata then
+    cprint("Node timeouted!",0xFF0000)
+    return
+  end
+  if rdata[1]~="banlist" then
+    cprint("Couldn't list: "..tostring(rdata[2]),0xFFCC33)
+    return
+  end
+  print("--Node bans---------")
+  for banned,_ in pairs(rdata[2]) do
+    print(banned)
+  end
+end
 --main
 if not mnp.isConnected() then cprint("You should be connected to network",0xFF0000) return false end
 node_ip=string.sub(os.getenv("this_ip"),1,4)..":0000"
@@ -124,5 +171,10 @@ elseif args[1]=="help" then help()
 elseif args[1]=="ban" then ban(args[2])
 elseif args[1]=="unban" then unban(args[2])
 elseif args[1]=="banip" then banip(args[2])
+elseif args[1]=="bandomain" then bandomain(args[2])
+elseif args[1]=="unbandomain" then unbandomain(args[2])
+elseif args[1]=="removedomain" then removedomain(args[2])
+elseif args[1]=="removedomainip" then removedomainip(args[2])
 elseif args[1]=="list" then list()
+elseif args[1]=="banlist" then banlist()
 else help() end
