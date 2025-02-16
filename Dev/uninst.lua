@@ -26,6 +26,7 @@ r("/lib/ipv2.lua")
 r("/lib/netpacket.lua")
 
 r("/usr/bin/cm.lua")
+r("/usr/bin/nadm.lua")
 r("/usr/bin/ssapClient.lua")
 r("/usr/bin/ssapServer.lua")
 r("/usr/bin/ftp-get.lua")
