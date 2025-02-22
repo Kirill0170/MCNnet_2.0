@@ -8,6 +8,9 @@ local shell=require("shell")
 local fs=require("filesystem")
 local gpu=require("component").gpu
 
+local defaultResolution2={}
+defaultResolution2["x"]=80
+defaultResolution2["y"]=22
 local defaultResolution="80x22"
 local defaultColormap="wool"
 local defaultBackground="0"
@@ -117,6 +120,63 @@ local function errorPage(url,code)
   local t=Tab:new(tdf.readFile(filename),url)
   t:print()
 end
+
+--Handler
+Handler={}
+Handler.allowedTypes={"source","tdf"}
+Handler.defaultType="source"
+Handler.__index=Handler
+function Handler.new(filename,type)
+  local obj=setmetatable({},Handler)
+  obj.filename=filename
+  for _,allowed_type in pairs(Handler.allowedTypes) do
+    if type==allowed_type then
+      obj.type=allowed_type
+      return obj
+    end
+  end
+  obj.type=Handler.defaultType
+  return obj
+end
+function Handler:view(scroll) --bars etc should be printed by tab
+  if not scroll then scroll=0 end
+  if self.type=="source" then
+    --default print file 
+    local file=io.open(self.filename,"r")
+    if not file then
+      --error page 
+      local lines="%e FileError %r \nNo such file: "..self.filename
+      local tfile=createLocalPage("FileError",lines)
+      local newtab=Tab:new(tfile,"browser://fileError",true) --FIX WITH HANDLER
+      newtab:print()
+      return
+    end
+    local lines={}
+    local prev=file:read("l")
+    while prev do
+      if prev then table.insert(lines,prev) end
+      prev=file:read("l")
+    end
+    local start_line=1+scroll
+    local end_line=start_line+defaultResolution2["y"]-1
+    if end_line>#lines then end_line=#lines end
+    for i=start_line,end_line do
+      print(lines[i])
+    end
+    return
+  elseif self.type=="tdf" then
+    if not self.tfile then
+      --init
+      self.tfile=tdf.readFile(self.filename)
+      if not self.tfile then
+        errorPage("browser://tdfFileFail","TDF_READ_FAIL")
+        return false
+      end
+    end
+    self.tfile:print({scroll,scroll+defaultResolution2["y"]-1},2)
+  end
+end
+
 --Tab
 Tab={}
 Tab.nextId=1
@@ -131,17 +191,17 @@ function printSelectedTab()
   Tab.tabs[Tab.selected]:print()
 end
 Tab.__index=Tab
-function Tab:new(tfile,url,loc)
-  if not tfile then return nil end
+function Tab:new(type,file,url,loc)
+  if not file then return nil end
   local instance=setmetatable({},Tab)
-  instance.title=tfile.config.title
-  instance.tfile=tfile
+  -- instance.title=tfile.config.title idk
+  instance.handler=Handler(type,file)
   instance.loc=loc or false
   instance.url=url
   instance.scroll=0
   instance.maxScroll=0
   instance.canScroll=false
-  local pageHeight=tonumber(tdf.util.splitBy(defaultResolution,"x")[2])
+  local pageHeight=tonumber(tdf.util.splitBy(defaultResolution,"x")[2]) --FIX THIS
   if instance.tfile.config.resolution[2]>pageHeight then
     instance.canScroll=true
     instance.maxScroll=instance.tfile.config.resolution[2]-pageHeight
@@ -171,8 +231,7 @@ end
 function Tab:print(scroll) --LOCAL
   if scroll then self.scroll=scroll end
   clearPage()
-  local height=tonumber(tdf.util.splitBy(defaultResolution,"x")[2])
-  self.tfile:print({self.scroll,self.scroll+height-1},2)
+  self.tfile:print({self.scroll,self.scroll+defaultResolution2["y"]-1},2)
   printTabBar(Tab.tabs,getTabIndex(self.id))
   printAddressBar(self.url,self.tfile,self.loc)
   printFooter(self)
@@ -209,6 +268,7 @@ function Tab:reload()
     return true
   end
 end
+
 function page(dest)
   if string.sub(dest,1,6)=="wdp://" then dest=string.sub(dest,7) end
   local hostname,filename=wdp.resolve(dest)
