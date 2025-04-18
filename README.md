@@ -31,8 +31,8 @@ Servers will be able to have domain names, like "example.com".
 ## Servers
 Servers are clients which are running some application and handle connections from another clients. There are different protocols of connecting to server, each designed to accomplish specific tasks. It is also possible to write your own protocol!
 # Protocols
-**[SSAP]** - (done)Simple Server Application Protocol, allows simple terminal connection with basic I/O facilities.  
-**[FTP]** - (done)simple File Transfer Protocol connection, however does not support TUI.
-**[WDP]** - Web Document Protocol - protocol for simple static webpages.
-**[SSTP]** - [Planned] Simple Site Transfer Protocol - graphical sites, as we know it.  
+**[SSAP]** - (done)Simple Server Application Protocol, allows simple terminal connection with basic I/O facilities.\
+**[FTP]** - (done)simple File Transfer Protocol connection, however does not support TUI.\
+**[WDP]** - Web Document Protocol - protocol for simple static webpages.\
+**[SSTP]** - [Planned] Simple Site Transfer Protocol - graphical sites, as we know it.\  
 **[UAP]** - Universal Auth Protocol, for managing logins.
